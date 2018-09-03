@@ -79,21 +79,10 @@ class SdfAssetPath;
 class UsdShadeConnectableAPI : public UsdAPISchemaBase
 {
 public:
-    /// Compile-time constant indicating whether or not this class corresponds
-    /// to a concrete instantiable prim type in scene description.  If this is
-    /// true, GetStaticPrimDefinition() will return a valid prim definition with
-    /// a non-empty typeName.
-    static const bool IsConcrete = false;
-
-    /// Compile-time constant indicating whether or not this class inherits from
-    /// UsdTyped. Types which inherit from UsdTyped can impart a typename on a
-    /// UsdPrim.
-    static const bool IsTyped = false;
-
-    /// Compile-time constant indicating whether or not this class represents a 
-    /// multiple-apply API schema. Mutiple-apply API schemas can be applied 
-    /// to the same prim multiple times with different instance names. 
-    static const bool IsMultipleApply = false;
+    /// Compile time constant representing what kind of schema this class is.
+    ///
+    /// \sa UsdSchemaType
+    static const UsdSchemaType schemaType = UsdSchemaType::NonAppliedAPI;
 
     /// Construct a UsdShadeConnectableAPI on UsdPrim \p prim .
     /// Equivalent to UsdShadeConnectableAPI::Get(prim.GetStage(), prim.GetPath())
@@ -137,21 +126,12 @@ public:
     Get(const UsdStagePtr &stage, const SdfPath &path);
 
 
-    /// Applies this <b>single-apply</b> API schema to the given \p prim.
-    /// This information is stored by adding "ConnectableAPI" to the 
-    /// token-valued, listOp metadata \em apiSchemas on the prim.
-    /// 
-    /// \return A valid UsdShadeConnectableAPI object is returned upon success. 
-    /// An invalid (or empty) UsdShadeConnectableAPI object is returned upon 
-    /// failure. See \ref UsdAPISchemaBase::_ApplyAPISchema() for conditions 
-    /// resulting in failure. 
-    /// 
-    /// \sa UsdPrim::GetAppliedSchemas()
-    /// \sa UsdPrim::HasAPI()
+protected:
+    /// Returns the type of schema this class belongs to.
     ///
+    /// \sa UsdSchemaType
     USDSHADE_API
-    static UsdShadeConnectableAPI 
-    Apply(const UsdPrim &prim);
+    virtual UsdSchemaType _GetSchemaType() const;
 
 private:
     // needs to invoke _GetStaticTfType.
@@ -177,25 +157,29 @@ public:
     // ===================================================================== //
     // --(BEGIN CUSTOM CODE)--
     
-private:
-    // Returns true if the given prim is compatible with this API schema,
-    // i.e. if it is a shader or a node-graph.
+protected:
+    /// Returns true if the given prim is compatible with this API schema,
+    /// i.e. if it is a valid shader or a node-graph.
     USDSHADE_API
-    virtual bool _IsCompatible(const UsdPrim &prim) const;
+    virtual bool _IsCompatible() const override;
     
 public:
 
     /// Constructor that takes a UsdShadeShader.
-    explicit UsdShadeConnectableAPI(const UsdShadeShader &shader):
+    /// Allow implicit (auto) conversion of UsdShadeShader to 
+    /// UsdShadeConnectableAPI, so that a shader can be passed into any function
+    /// that accepts a ConnectableAPI.
+    UsdShadeConnectableAPI(const UsdShadeShader &shader):
         UsdShadeConnectableAPI(shader.GetPrim())
-    {        
-    }
+    { }
 
     /// Constructor that takes a UsdShadeNodeGraph.
-    explicit UsdShadeConnectableAPI(const UsdShadeNodeGraph &nodeGraph):
+    /// Allow implicit (auto) conversion of UsdShadeNodeGraph to 
+    /// UsdShadeConnectableAPI, so that a nodegraph can be passed into any function
+    /// that accepts a ConnectableAPI.
+    UsdShadeConnectableAPI(const UsdShadeNodeGraph &nodeGraph):
         UsdShadeConnectableAPI(nodeGraph.GetPrim())
-    {        
-    }
+    { }
 
     /// Returns true if the prim is a shader.
     USDSHADE_API
@@ -204,20 +188,6 @@ public:
     /// Returns true if the prim is a node-graph.
     USDSHADE_API
     bool IsNodeGraph() const;
-
-    /// Allow UsdShadeConnectableAPI to auto-convert to UsdShadeNodeGraph, so 
-    /// you can pass in a UsdShadeConnectableAPI to any function that accepts 
-    /// a UsdShadeNodeGraph.
-    operator UsdShadeNodeGraph () {
-        return UsdShadeNodeGraph(GetPrim());
-    }
-
-    /// Allow UsdShadeConnectableAPI to auto-convert to UsdShadeShader, so 
-    /// you can pass in a UsdShadeConnectableAPI to any function that accepts 
-    /// a UsdShadeShader.
-    operator UsdShadeShader () {
-        return UsdShadeShader(GetPrim());
-    }
 
     /// \name Connections 
     /// 

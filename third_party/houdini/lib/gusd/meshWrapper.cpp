@@ -710,15 +710,6 @@ getSubdivisionScheme() const
 }
 
 
-bool GusdMeshWrapper::
-getUniqueID(int64& id) const
-{
-    static const int s_id = GT_Primitive::createPrimitiveTypeId();
-    id = s_id;
-    return true;
-}
-
-
 const char* GusdMeshWrapper::
 className() const
 {
@@ -759,7 +750,7 @@ doSoftCopy() const
 
 bool GusdMeshWrapper::isValid() const
 {
-    return m_usdMesh;
+    return static_cast<bool>(m_usdMesh);
 }
 
 bool GusdMeshWrapper::

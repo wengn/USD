@@ -35,6 +35,7 @@
 #include "pxr/imaging/hd/primGather.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/repr.h"
+#include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
@@ -66,7 +67,6 @@ HdRenderIndex::HdRenderIndex(HdRenderDelegate *renderDelegate)
     , _tracker()
     , _nextPrimId(1)
     , _instancerMap()
-    , _extComputationMap()
     , _syncQueue()
     , _renderDelegate(renderDelegate)
 {
@@ -105,7 +105,6 @@ HdRenderIndex::RemoveSubtree(const SdfPath &root,
     _sprimIndex.RemoveSubtree(root, sceneDelegate, _tracker, _renderDelegate);
     _bprimIndex.RemoveSubtree(root, sceneDelegate, _tracker, _renderDelegate);
     _RemoveInstancerSubtree(root, sceneDelegate);
-    _RemoveExtComputationSubtree(root, sceneDelegate);
     _RemoveTaskSubtree(root, sceneDelegate);
 }
 
@@ -303,13 +302,6 @@ HdRenderIndex::Clear()
     }
     _taskMap.clear();
 
-    // Clear ExtComputations.
-    TF_FOR_ALL(it, _extComputationMap) {
-        _tracker.ExtComputationRemoved(it->first);
-    }
-    _extComputationMap.clear();
-
-
     // After clearing the index, all collections must be invalidated to force
     // any dependent state to be updated.
     _tracker.MarkAllCollectionsDirty();
@@ -451,7 +443,7 @@ HdRenderIndex::RemoveBprim(TfToken const& typeId, SdfPath const& id)
     _bprimIndex.RemovePrim(typeId, id, _tracker, _renderDelegate);
 }
 
-HdBprim const*
+HdBprim *
 HdRenderIndex::GetBprim(TfToken const& typeId, SdfPath const& id) const
 {
     return _bprimIndex.GetPrim(typeId, id);
@@ -470,110 +462,6 @@ HdBprim *
 HdRenderIndex::GetFallbackBprim(TfToken const& typeId) const
 {
     return _bprimIndex.GetFallbackPrim(typeId);
-}
-
-// ---------------------------------------------------------------------- //
-// ExtComputation Support
-// ---------------------------------------------------------------------- //
-
-void
-HdRenderIndex::InsertExtComputation(HdSceneDelegate *sceneDelegate,
-                                    SdfPath const &id)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    HdExtComputationPtr extComputation =
-                                  HdExtComputationPtr(new HdExtComputation(id));
-
-
-    _extComputationMap.emplace(id,
-                               _ExtComputationInfo {
-                                   sceneDelegate,
-                                   std::move(extComputation)
-                               });
-
-    _tracker.ExtComputationInserted(id,
-                                    extComputation->GetInitialDirtyBits());
-
-}
-
-void
-HdRenderIndex::RemoveExtComputation(SdfPath const& id)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    _ExtComputationMap::const_iterator it = _extComputationMap.find(id);
-    if (it == _extComputationMap.cend()) {
-        return;
-    }
-
-    _tracker.ExtComputationRemoved(id);
-    _extComputationMap.erase(it);
-}
-
-
-
-
-HdExtComputation const *
-HdRenderIndex::GetExtComputation(SdfPath const &id) const
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    _ExtComputationMap::const_iterator it = _extComputationMap.find(id);
-    if (it == _extComputationMap.cend()) {
-        return nullptr;
-    }
-
-    return it->second.extComputation.get();
-}
-
-void
-HdRenderIndex::GetExtComputationInfo(SdfPath const &id,
-                                     HdExtComputation **computation,
-                                     HdSceneDelegate **sceneDelegate)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    if (computation == nullptr || sceneDelegate == nullptr) {
-        TF_CODING_ERROR("Null passed for argument");
-        return;
-    }
-
-    _ExtComputationMap::const_iterator it = _extComputationMap.find(id);
-    if (it == _extComputationMap.cend()) {
-        *computation   = nullptr;
-        *sceneDelegate = nullptr;
-        return;
-    }
-
-    *computation   = it->second.extComputation.get();
-    *sceneDelegate = it->second.sceneDelegate;
-}
-
-void
-HdRenderIndex::_RemoveExtComputationSubtree(const SdfPath &root,
-                                            HdSceneDelegate* sceneDelegate)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    _ExtComputationMap::iterator it = _extComputationMap.begin();
-    while (it != _extComputationMap.end()) {
-        const SdfPath &id = it->first;
-        const _ExtComputationInfo &compInfo = it->second;
-
-        if ((compInfo.sceneDelegate == sceneDelegate) &&
-            (id.HasPrefix(root))) {
-            _tracker.ExtComputationRemoved(id);
-            it = _extComputationMap.erase(it);
-        } else {
-            ++it;
-        }
-    }
 }
 
 // ---------------------------------------------------------------------- //
@@ -617,43 +505,43 @@ HdRenderIndex::_ConfigureReprs()
                           HdMeshReprDesc(HdMeshGeomStyleHull,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/false,
+                                         /*flatShadingEnabled=*/true,
                                          /*blendWireframeColor=*/false));
     HdMesh::ConfigureRepr(HdTokens->smoothHull,
                           HdMeshReprDesc(HdMeshGeomStyleHull,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/false));
     HdMesh::ConfigureRepr(HdTokens->wire,
                           HdMeshReprDesc(HdMeshGeomStyleHullEdgeOnly,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/true));
     HdMesh::ConfigureRepr(HdTokens->wireOnSurf,
                           HdMeshReprDesc(HdMeshGeomStyleHullEdgeOnSurf,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/true));
     HdMesh::ConfigureRepr(HdTokens->refined,
                           HdMeshReprDesc(HdMeshGeomStyleSurf,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/false));
     HdMesh::ConfigureRepr(HdTokens->refinedWire,
                           HdMeshReprDesc(HdMeshGeomStyleEdgeOnly,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/true));
     HdMesh::ConfigureRepr(HdTokens->refinedWireOnSurf,
                           HdMeshReprDesc(HdMeshGeomStyleEdgeOnSurf,
                                          HdCullStyleDontCare,
                                          HdMeshReprDescTokens->surfaceShader,
-                                         /*smoothNormals=*/true,
+                                         /*flatShadingEnabled=*/false,
                                          /*blendWireframeColor=*/true));
 
     // TODO: Port over wire on surf geometry shader from internal code base
@@ -1048,21 +936,27 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector const &tasks,
     HdRenderParam *renderParam = _renderDelegate->GetRenderParam();
 
     _bprimIndex.SyncPrims(_tracker, _renderDelegate->GetRenderParam());
-    _sprimIndex.SyncPrims(_tracker, _renderDelegate->GetRenderParam());
 
-    {
-        HF_TRACE_FUNCTION_SCOPE("Sync Ext Computations");
-        TF_FOR_ALL(it, _extComputationMap) {
-            const SdfPath &compId = it->first;
-            _ExtComputationInfo &compInfo = it->second;
+    // Texture Bprims contain a deduplication system, where certain paramters
+    // such as maximum texture size are resolved by looking at all the
+    // references.
+    //
+    // At this point new textures may have been added to the system, but old
+    // references haven't been removed yet.
+    //
+    // As Material Sprims need the resolved state of the textures.
+    // Therefore, the old references are cleaned up here, before Sprim
+    // processing
+    if (_tracker.IsBprimGarbageCollectionNeeded()) {
+        HdResourceRegistrySharedPtr registry = GetResourceRegistry();
 
-            HdDirtyBits dirtyBits = _tracker.GetExtComputationDirtyBits(compId);
-            if (HdChangeTracker::IsDirty(dirtyBits)) {
-                compInfo.extComputation->Sync(compInfo.sceneDelegate, &dirtyBits);
-                _tracker.MarkExtComputationClean(compId, dirtyBits);
-            }
-        }
+        registry->GarbageCollectBprims();
+
+        _tracker.ClearBprimGarbageCollectionNeeded();
     }
+
+
+    _sprimIndex.SyncPrims(_tracker, _renderDelegate->GetRenderParam());
 
     // could be in parallel... but how?
     // may be just gathering dirtyLists at first, and then index->sync()?

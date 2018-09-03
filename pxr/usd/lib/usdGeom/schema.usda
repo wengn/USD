@@ -49,7 +49,7 @@ over "GLOBAL" (
                 interpolation between vertices."""
             }
             dictionary faceVarying = {
-                string doc = """Possible value for UsdGeomPrimVar::SetInterpolation.
+                string doc = """Possible value for UsdGeomPrimvar::SetInterpolation.
                 For polygons and subdivision surfaces, four values are
                 interpolated over each face of the mesh. Bilinear interpolation 
                 is used for interpolation between the four values."""
@@ -67,7 +67,9 @@ over "GLOBAL" (
             }
             dictionary collection = {
                 string doc = """This is the namespace prefix used by 
-                UsdGeomCollectionAPI for authoring collections."""
+                the deprecated UsdGeomCollectionAPI for authoring collections.
+                Use UsdTokens->collection instead, which is used by the new
+                collection schema UsdCollectionAPI."""
             }
             dictionary upAxis = {
                 string doc = """Stage-level metadata that encodes a scene's
@@ -109,10 +111,10 @@ class "Imageable" (
     are \\em visibility and \\em purpose, which each provide instructions for
     what geometry should be included for processing by rendering and other
     computations.
-    
-    Imageable also introduces the concept (and API) of geometric
-    "primitive variables", as UsdGeomPrimvar, which interpolate across a 
-    primitive and can override shader inputs.""" 
+
+    <Deprecated> Imageable also provides API for accessing primvars, which
+    have been moved to the UsdGeomPrimvarsAPI schema.  This API is planned
+    to be removed, UsdGeomPrimvarsAPI should be used directly instead."""
     customData = {
         string extraIncludes = """
 #include "pxr/base/gf/bbox3d.h"
@@ -189,6 +191,19 @@ class "Imageable" (
         \\note It is only valid to author the proxyPrim relationship on
         prims whose purpose is "render"."""
     )
+}
+
+class "PrimvarsAPI" (
+    inherits = </APISchemaBase>
+    doc = """UsdGeomPrimvarsAPI encodes geometric "primitive variables",
+    as UsdGeomPrimvar, which interpolate across a primitive's topology,
+    can override shader inputs, and inherit down namespace.""" 
+    customData = {
+        token apiSchemaType = "nonApplied"
+        string extraIncludes = """
+#include "pxr/usd/usdGeom/primvar.h" """
+    }
+) {
 }
 
 class "Xformable" (
@@ -721,13 +736,14 @@ class "PointBased" (
 
     # shaping
     normal3f[] normals (
-        doc = """Provide orientation for individual points, which, depending on
-        subclass, may define a surface, curve, or free points.  Note that in
-        general you should not need or want to provide 'normals' for any
-        Mesh that is subdivided, as the subdivision scheme will provide smooth
-        normals.  'normals' is not a generic Primvar,
-        but the number of elements in this attribute will be determined by
-        its 'interpolation'.  See \\ref SetNormalsInterpolation()"""
+        doc = """Provide an object-space orientation for individual points, 
+        which, depending on subclass, may define a surface, curve, or free 
+        points.  Note that 'normals' should not be authored on any Mesh that
+        is subdivided, since the subdivision algorithm will define its own
+        normals. 'normals' is not a generic primvar, but the number of elements
+        in this attribute will be determined by its 'interpolation'.  See
+        \\ref SetNormalsInterpolation() . If 'normals' and 'primvars:normals'
+        are both specified, the latter has precedence."""
     )
 }
 
@@ -750,11 +766,16 @@ class Mesh "Mesh" (
     \\em subdivisionScheme attribute.
     
     \\section UsdGeom_Mesh_Normals A Note About Normals
-    
-    Although the \\em normals attribute inherited from PointBased can be authored
-    on any mesh, they are almost never needed for subdivided meshes, and only
-    add rendering cost.  You may consider only authoring them for polygonal
-    meshes."""
+
+    Normals should not be authored on a subdivided mesh, since subdivision
+    algorithms define their own normals. They should only be authored for
+    polygonal meshes.
+
+    The 'normals' attribute inherited from UsdGeomPointBased is not a generic
+    primvar, but the number of elements in this attribute will be determined by
+    its 'interpolation'.  See \\ref UsdGeomPointBased::GetNormalsInterpolation() .
+    If 'normals' and 'primvars:normals' are both specified, the latter has
+    precedence."""
 ) {
     #
     # Common Properties
@@ -1111,7 +1132,8 @@ class "Curves" (
         it), in which case widths are "ribbon width", or unoriented, in which
         case widths are cylinder width.  'widths' is not a generic Primvar,
         but the number of elements in this attribute will be determined by
-        its 'interpolation'.  See \\ref SetWidthsInterpolation()"""
+        its 'interpolation'.  See \\ref SetWidthsInterpolation() .  If 'widths'
+        and 'primvars:widths' are both specified, the latter has precedence."""
     )
 }
 
@@ -1302,13 +1324,21 @@ class Points "Points" (
     Points can be an efficient means of storing and rendering particle
     effects comprised of thousands or millions of small particles.  Points
     generally receive a single shading sample each, which should take 
-    \\em normals into account, if present."""
+    \\em normals into account, if present.
+
+    While not technically UsdGeomPrimvars, the widths and normals also
+    have interpolation metadata.  It's common for authored widths and normals
+    to have constant or varying interpolation."""
 
 ) {
     # shaping attributes
     float[] widths (
         doc = """Widths are defined as the \\em diameter of the points, in 
-                 object space"""
+                 object space.  'widths' is not a generic Primvar, but
+                 the number of elements in this attribute will be determined by
+                 its 'interpolation'.  See \\ref SetWidthsInterpolation() .  If
+                 'widths' and 'primvars:widths' are both specified, the latter
+                 has precedence."""
     )
     
     int64[] ids (
@@ -1400,6 +1430,11 @@ class PointInstancer "PointInstancer" (
     prim itself (or the UsdGeomImageable::ComputeLocalToWorldTransform() of the 
     PointInstancer to put the instance directly into world space)
 
+    If neither *velocities* nor *angularVelocities* are authored, we fallback to
+    standard position and orientation computation logic (using linear
+    interpolation between timeSamples) as described by
+    \\ref UsdGeom_VelocityInterpolation .
+
     \\anchor UsdGeom_PITimeScaling
     <b>Scaling Velocities for Interpolation</b>
     
@@ -1408,11 +1443,18 @@ class PointInstancer "PointInstancer" (
     ( 1.0 / UsdStage::GetTimeCodesPerSecond() ), because velocities are recorded
     in units/second, while we are interpolating in UsdTimeCode ordinates.
     
+    Additionally, if *motion:velocityScale* is authored or inherited (see
+    UsdGeomMotionAPI::ComputeVelocityScale()), it is used to scale both the
+    velocity and angular velocity by a constant value during computation. The
+    *motion:velocityScale* attribute is encoded by UsdGeomMotionAPI.
+
     We provide both high and low-level API's for dealing with the
     transformation as a matrix, both will compute the instance matrices using
     multiple threads; the low-level API allows the client to cache unvarying
     inputs so that they need not be read duplicately when computing over
     time.
+
+    See also \\ref UsdGeom_VelocityInterpolation .
     
     \\section UsdGeomPointInstancer_primvars Primvars on PointInstancer
     
@@ -1711,6 +1753,7 @@ class Camera "Camera" (
 
 class "GeomModelAPI"
 (
+    inherits = </APISchemaBase>
     customData = {
          string className = "ModelAPI"
          string extraIncludes = """
@@ -1746,13 +1789,17 @@ class "GeomModelAPI"
     \\em model:drawMode is inheritable so that a whole scene, a large group, or
     all prototypes of a model hierarchy PointInstancer can be assigned a draw
     mode with a single attribute edit.  \\em model:applyDrawMode is meant to be
-    authored earlier, and provides flexibility for different asset types. For
-    example, a character assembly (composed of character, clothes, etc) might
-    have \\em model:applyDrawMode set at the top of the subtree so the whole
-    group can be drawn as a single card object. An effects subtree might have
-    \\em model:applyDrawMode set at the component level so each particle group
-    draws individually in bounding box mode.
+    written when an asset is authored, and provides flexibility for different
+    asset types. For example, a character assembly (composed of character,
+    clothes, etc) might have \\em model:applyDrawMode set at the top of the
+    subtree so the whole group can be drawn as a single card object. An effects
+    subtree might have \\em model:applyDrawMode set at a lower level so each
+    particle group draws individually.
 
+    Models of kind component are treated as if \\em model:applyDrawMode
+    were true.  This means a prim is drawn with proxy geometry when: the
+    prim has kind component, and/or \\em model:applyDrawMode is set; and
+    the prim or an ancestor has a non-default value for \\em model:drawMode.
     A value for \\em model:drawMode on a child prim takes precedence over a
     value on a parent prim.
 
@@ -1778,6 +1825,10 @@ class "GeomModelAPI"
     s-axis. Any card faces with invalid asset paths will be drawn with
     \\em model:drawModeColor.
 
+    Both \\em model:cardGeometry and \\em model:drawModeColor should be
+    authored on the prim where the draw mode takes effect, since these
+    attributes are not inherited.
+
     For \\em fromTexture mode, only card faces with valid textures assigned
     are drawn. The geometry is generated by pulling the \\em worldtoscreen
     attribute out of texture metadata.  This is expected to be a 4x4 matrix
@@ -1788,10 +1839,9 @@ class "GeomModelAPI"
     If the metadata cannot be read in the right format, or the matrix can't
     be inverted, the card face is not drawn.
 
-    All card faces are drawn and textured as double-sided.
+    All card faces are drawn and textured as single-sided.
 
     \\todo CreatePayload() """
-    inherits = </ModelAPI>
 )
 {
     uniform token model:drawMode (
@@ -1848,6 +1898,7 @@ class "GeomModelAPI"
 
 class "MotionAPI"
 (
+    inherits = </APISchemaBase>
     doc = """UsdGeomMotionAPI encodes data that can live on any prim that
     may affect computations involving:
     - computed motion for motion blur

@@ -35,7 +35,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_REGISTRY_FUNCTION(TfType)
 {
     TfType::Define<UsdGeomModelAPI,
-        TfType::Bases< UsdModelAPI > >();
+        TfType::Bases< UsdAPISchemaBase > >();
     
 }
 
@@ -60,6 +60,11 @@ UsdGeomModelAPI::Get(const UsdStagePtr &stage, const SdfPath &path)
     return UsdGeomModelAPI(stage->GetPrimAtPath(path));
 }
 
+
+/* virtual */
+UsdSchemaType UsdGeomModelAPI::_GetSchemaType() const {
+    return UsdGeomModelAPI::schemaType;
+}
 
 /* static */
 UsdGeomModelAPI
@@ -292,7 +297,7 @@ UsdGeomModelAPI::GetSchemaAttributeNames(bool includeInherited)
     };
     static TfTokenVector allNames =
         _ConcatenateAttributeNames(
-            UsdModelAPI::GetSchemaAttributeNames(true),
+            UsdAPISchemaBase::GetSchemaAttributeNames(true),
             localNames);
 
     if (includeInherited)

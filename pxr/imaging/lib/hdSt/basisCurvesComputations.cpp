@@ -120,7 +120,7 @@ HdSt_BasisCurvesIndexBuilderComputation::HdSt_BasisCurvesIndexBuilderComputation
 }
 
 void
-HdSt_BasisCurvesIndexBuilderComputation::AddBufferSpecs(
+HdSt_BasisCurvesIndexBuilderComputation::GetBufferSpecs(
     HdBufferSpecVector *specs) const
 {
     // index buffer
@@ -199,7 +199,7 @@ HdSt_BasisCurvesIndexBuilderComputation::_BuildLineSegmentIndexArray()
 {
     std::vector<GfVec2i> indices;
     std::vector<int> primIndices;
-    VtArray<int> vertexCounts = _topology->GetCurveVertexCounts();
+    const VtArray<int> vertexCounts = _topology->GetCurveVertexCounts();
     bool wrap = _topology->GetCurveWrap() == HdTokens->periodic;
     int vertexIndex = 0;
     int curveIndex = 0;
@@ -303,7 +303,7 @@ HdSt_BasisCurvesIndexBuilderComputation::_BuildCubicIndexArray()
     std::vector<GfVec4i> indices;
     std::vector<int> primIndices;
 
-    VtArray<int> vertexCounts = _topology->GetCurveVertexCounts();
+    const VtArray<int> vertexCounts = _topology->GetCurveVertexCounts();
     bool wrap = _topology->GetCurveWrap() == HdTokens->periodic;
     int vStep;
     TfToken basis = _topology->GetCurveBasis();
@@ -453,7 +453,7 @@ HdSt_BasisCurvesWidthsInterpolaterComputation::HdSt_BasisCurvesWidthsInterpolate
 }
 
 void
-HdSt_BasisCurvesWidthsInterpolaterComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_BasisCurvesWidthsInterpolaterComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     specs->emplace_back(HdTokens->widths, HdTupleType{HdTypeFloat, 1});
 }
@@ -521,7 +521,7 @@ HdSt_BasisCurvesNormalsInterpolaterComputation::HdSt_BasisCurvesNormalsInterpola
 }
 
 void
-HdSt_BasisCurvesNormalsInterpolaterComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_BasisCurvesNormalsInterpolaterComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     specs->emplace_back(HdTokens->normals, HdTupleType{HdTypeFloatVec3, 1});
 }

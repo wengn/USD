@@ -37,9 +37,6 @@
 #include "pxr/base/tf/weakBase.h"
 #include "pxr/base/tf/weakPtr.h"
 
-#include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
-
 #include <mutex>
 #include <string>
 #include <vector>
@@ -47,7 +44,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_PTRS(PlugPlugin);
-struct Plug_RegistrationMetadata;
+class Plug_RegistrationMetadata;
 
 /// \class PlugRegistry
 ///
@@ -169,8 +166,8 @@ struct Plug_RegistrationMetadata;
 ///
 /// \section plug_Advertising Advertising a Plug-in's Contents
 ///
-/// Once the the plug-ins are registered, the plug-in facility must also be 
-/// able to tell what they contain.  Specifically, it must be able to find 
+/// Once the plug-ins are registered, the plug-in facility must also be
+/// able to tell what they contain.  Specifically, it must be able to find
 /// out what subclasses of what plug-in base classes each plug-in contains.
 /// Plug-ins must advertise this information through their plugInfo.json file
 /// in the "Info" key.  In the "Info" object there should be a key "Types"
@@ -184,7 +181,7 @@ struct Plug_RegistrationMetadata;
 /// called "bases" whose value should be an array of base class type names.
 ///
 /// For example, a bundle that contains a subclass of ImageFilter might have
-/// a plugInfo.json that looks like the the following example.
+/// a plugInfo.json that looks like the following example.
 ///
 /// \code
 /// {
@@ -336,7 +333,9 @@ struct Plug_RegistrationMetadata;
 /// \endcode
 ///
 
-class PlugRegistry : public TfWeakBase, boost::noncopyable {
+class PlugRegistry : public TfWeakBase {
+    PlugRegistry(PlugRegistry const &) = delete;
+    PlugRegistry &operator=(PlugRegistry const &) = delete;
 public:
     typedef PlugRegistry This;
     typedef std::vector<TfType> TypeVector;
@@ -458,8 +457,6 @@ private:
 
 private:
     TfHashSet<std::string, TfHash> _registeredPluginPaths;
-
-    boost::scoped_ptr<class Plug_TaskArena> _dispatcher;
 
     std::mutex _mutex;
 };

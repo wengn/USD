@@ -31,7 +31,7 @@
 #include "pxr/imaging/hd/texture.h"
 #include "pxr/imaging/hd/textureResource.h"
 
-#include "pxr/imaging/hdSt/camera.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/drawTargetAttachmentDescArray.h"
 #include "pxr/imaging/hdSt/light.h"
@@ -170,7 +170,7 @@ Hdx_UnitTestDelegate::SetRefineLevel(int level)
     _refineLevel = level;
     TF_FOR_ALL (it, _meshes) {
         GetRenderIndex().GetChangeTracker().MarkRprimDirty(
-            it->first, HdChangeTracker::DirtyRefineLevel);
+            it->first, HdChangeTracker::DirtyDisplayStyle);
     }
     TF_FOR_ALL (it, _refineLevels) {
         it->second = level;
@@ -190,12 +190,12 @@ Hdx_UnitTestDelegate::SetCamera(SdfPath const &cameraId,
                                 GfMatrix4d const &projMatrix)
 {
     _ValueCache &cache = _valueCacheMap[cameraId];
-    cache[HdStCameraTokens->windowPolicy] = VtValue(CameraUtilFit);
-    cache[HdStCameraTokens->worldToViewMatrix] = VtValue(viewMatrix);
-    cache[HdStCameraTokens->projectionMatrix] = VtValue(projMatrix);
+    cache[HdCameraTokens->windowPolicy] = VtValue(CameraUtilFit);
+    cache[HdCameraTokens->worldToViewMatrix] = VtValue(viewMatrix);
+    cache[HdCameraTokens->projectionMatrix] = VtValue(projMatrix);
 
     GetRenderIndex().GetChangeTracker().MarkSprimDirty(cameraId,
-                                                       HdStCamera::AllDirty);
+                                                       HdCamera::AllDirty);
 }
 
 void
@@ -204,9 +204,9 @@ Hdx_UnitTestDelegate::AddCamera(SdfPath const &id)
     // add a camera
     GetRenderIndex().InsertSprim(HdPrimTypeTokens->camera, this, id);
     _ValueCache &cache = _valueCacheMap[id];
-    cache[HdStCameraTokens->windowPolicy] = VtValue(CameraUtilFit);
-    cache[HdStCameraTokens->worldToViewMatrix] = VtValue(GfMatrix4d(1.0));
-    cache[HdStCameraTokens->projectionMatrix] = VtValue(GfMatrix4d(1.0));
+    cache[HdCameraTokens->windowPolicy] = VtValue(CameraUtilFit);
+    cache[HdCameraTokens->worldToViewMatrix] = VtValue(GfMatrix4d(1.0));
+    cache[HdCameraTokens->projectionMatrix] = VtValue(GfMatrix4d(1.0));
 }
 
 void
@@ -264,7 +264,7 @@ Hdx_UnitTestDelegate::AddDrawTarget(SdfPath const &id)
 
     HdStDrawTargetAttachmentDescArray attachments;
     attachments.AddAttachment("color",
-                              HdFormatR8G8B8A8UNorm,
+                              HdFormatUNorm8Vec4,
                               VtValue(GfVec4f(1,1,0,1)),
                               HdWrapRepeat,
                               HdWrapRepeat,
@@ -472,7 +472,8 @@ Hdx_UnitTestDelegate::AddMesh(SdfPath const &id,
     _meshes[id] = _Mesh(scheme, orientation, transform,
                         points, numVerts, verts, PxOsdSubdivTags(),
                         /*color=*/VtValue(GfVec4f(1, 1, 0, 1)),
-                        /*colorInterpolation=*/CONSTANT, guide, doubleSided);
+                        /*colorInterpolation=*/HdInterpolationConstant,
+                        guide, doubleSided);
     if (!instancerId.IsEmpty()) {
         _instancers[instancerId].prototypes.push_back(id);
     }
@@ -486,7 +487,7 @@ Hdx_UnitTestDelegate::AddMesh(SdfPath const &id,
                              VtIntArray const &verts,
                              PxOsdSubdivTags const &subdivTags,
                              VtValue const &color,
-                             Interpolation colorInterpolation,
+                             HdInterpolation colorInterpolation,
                              bool guide,
                              SdfPath const &instancerId,
                              TfToken const &scheme,
@@ -508,7 +509,7 @@ void
 Hdx_UnitTestDelegate::AddCube(SdfPath const &id, GfMatrix4d const &transform, 
                               bool guide, SdfPath const &instancerId, 
                               TfToken const &scheme, VtValue const &color,
-                              Interpolation colorInterpolation)
+                              HdInterpolation colorInterpolation)
 {
     GfVec3f points[] = {
         GfVec3f( 1.0f, 1.0f, 1.0f ),
@@ -583,7 +584,7 @@ Hdx_UnitTestDelegate::AddGrid(SdfPath const &id,
             _BuildArray(&verts[0], verts.size()),
             PxOsdSubdivTags(),
             /*color=*/VtValue(GfVec4f(1,1,0,1)),
-            /*colorInterpolation=*/CONSTANT,
+            /*colorInterpolation=*/HdInterpolationConstant,
             false,
             instancerId);
 }
@@ -636,7 +637,7 @@ Hdx_UnitTestDelegate::AddTet(SdfPath const &id, GfMatrix4d const &transform,
             _BuildArray(verts, sizeof(verts)/sizeof(verts[0])),
             PxOsdSubdivTags(),
             /*color=*/VtValue(GfVec4f(1,1,1,1)),
-            /*colorInterpolation=*/CONSTANT,
+            /*colorInterpolation=*/HdInterpolationConstant,
             guide,
             instancerId,
             scheme);
@@ -647,7 +648,7 @@ Hdx_UnitTestDelegate::SetRefineLevel(SdfPath const &id, int level)
 {
     _refineLevels[id] = level;
     GetRenderIndex().GetChangeTracker().MarkRprimDirty(
-        id, HdChangeTracker::DirtyRefineLevel);
+        id, HdChangeTracker::DirtyDisplayStyle);
 }
 
 TfToken
@@ -742,11 +743,6 @@ Hdx_UnitTestDelegate::Get(SdfPath const& id, TfToken const& key)
         if (_instancers.find(id) != _instancers.end()) {
             return VtValue(_instancers[id].translate);
         }
-    } else if (key == HdShaderTokens->material) {
-        SdfPath materialId;
-        TfMapLookup(_materialBindings, id, &materialId);
-
-        return VtValue(materialId);
     }
     return VtValue();
 }
@@ -791,74 +787,38 @@ Hdx_UnitTestDelegate::GetInstancerTransform(SdfPath const& instancerId,
     return GfMatrix4d(1);
 }
 
-int
-Hdx_UnitTestDelegate::GetRefineLevel(SdfPath const& id)
+/*virtual*/
+HdDisplayStyle
+Hdx_UnitTestDelegate::GetDisplayStyle(SdfPath const& id)
 {
     if (_refineLevels.find(id) != _refineLevels.end()) {
-        return _refineLevels[id];
+        return HdDisplayStyle(_refineLevels[id]);
     }
-    return _refineLevel;
+    return HdDisplayStyle(_refineLevel);
 }
 
-TfTokenVector
-Hdx_UnitTestDelegate::GetPrimVarVertexNames(SdfPath const& id)
-{
-    TfTokenVector names;
-    names.push_back(HdTokens->points);
+HdPrimvarDescriptorVector
+Hdx_UnitTestDelegate::GetPrimvarDescriptors(SdfPath const& id, 
+                                            HdInterpolation interpolation)
+{       
+    HdPrimvarDescriptorVector primvars;
+    if (interpolation == HdInterpolationVertex) {
+        primvars.emplace_back(HdTokens->points, interpolation,
+                              HdPrimvarRoleTokens->point);
+    }                       
     if(_meshes.find(id) != _meshes.end()) {
-        if (_meshes[id].colorInterpolation == VERTEX) {
-            names.push_back(HdTokens->color);
-        }
-    } 
-    return names;
-}
-
-TfTokenVector
-Hdx_UnitTestDelegate::GetPrimVarConstantNames(SdfPath const& id)
-{
-    TfTokenVector names;
-    if(_meshes.find(id) != _meshes.end()) {
-        if (_meshes[id].colorInterpolation == CONSTANT) {
-            names.push_back(HdTokens->color);
+        if (_meshes[id].colorInterpolation == interpolation) {
+            primvars.emplace_back(HdTokens->color, interpolation,
+                                  HdPrimvarRoleTokens->color);
         }
     }
-    return names;
-}
-
-TfTokenVector
-Hdx_UnitTestDelegate::GetPrimVarFacevaryingNames(SdfPath const& id)
-{
-    TfTokenVector names;
-    if (_meshes.find(id) != _meshes.end()) {
-        if (_meshes[id].colorInterpolation == FACEVARYING) {
-            names.push_back(HdTokens->color);
-        }
+    if (interpolation == HdInterpolationInstance &&
+        _instancers.find(id) != _instancers.end()) {
+        primvars.emplace_back(_tokens->scale, interpolation);
+        primvars.emplace_back(_tokens->rotate, interpolation);
+        primvars.emplace_back(_tokens->translate, interpolation);
     }
-    return names;
-}
-
-TfTokenVector
-Hdx_UnitTestDelegate::GetPrimVarUniformNames(SdfPath const& id)
-{
-    TfTokenVector names;
-    if(_meshes.find(id) != _meshes.end()) {
-        if (_meshes[id].colorInterpolation == UNIFORM) {
-            names.push_back(HdTokens->color);
-        }
-    }
-    return names;
-}
-
-TfTokenVector
-Hdx_UnitTestDelegate::GetPrimVarInstanceNames(SdfPath const &id)
-{
-    TfTokenVector names;
-    if (_instancers.find(id) != _instancers.end()) {
-        names.push_back(_tokens->scale);
-        names.push_back(_tokens->rotate);
-        names.push_back(_tokens->translate);
-    }
-    return names;
+    return primvars;
 }
 
 void
@@ -877,6 +837,15 @@ Hdx_UnitTestDelegate::BindMaterial(SdfPath const &rprimId,
                                  SdfPath const &materialId)
 {
     _materialBindings[rprimId] = materialId;
+}
+
+/*virtual*/ 
+SdfPath 
+Hdx_UnitTestDelegate::GetMaterialId(SdfPath const &rprimId)
+{
+    SdfPath materialId;
+    TfMapLookup(_materialBindings, rprimId, &materialId);
+    return materialId;
 }
 
 /*virtual*/

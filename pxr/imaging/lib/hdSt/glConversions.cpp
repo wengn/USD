@@ -38,25 +38,25 @@ struct _FormatDesc {
 static const _FormatDesc FORMAT_DESC[] =
 {
     // format,  type,          internal format
-    {GL_RED,  GL_UNSIGNED_BYTE, GL_RED},     // HdFormatR8UNorm,
-    {GL_RED,  GL_BYTE,          GL_R8},      // HdFormatR8SNorm.
+    {GL_RED,  GL_UNSIGNED_BYTE, GL_R8},      // HdFormatUNorm8,
+    {GL_RG,   GL_UNSIGNED_BYTE, GL_RG8},     // HdFormatUNorm8Vec2,
+    {GL_RGB,  GL_UNSIGNED_BYTE, GL_RGB8},    // HdFormatUNorm8Vec3,
+    {GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8},   // HdFormatUNorm8Vec4,
 
-    {GL_RG,   GL_UNSIGNED_BYTE, GL_RG8},     // HdFormatR8G8UNorm,
-    {GL_RG,   GL_BYTE,          GL_RG8},     // HdFormatR8G8SNorm,
+    {GL_RED,  GL_BYTE,          GL_R8_SNORM},      // HdFormatSNorm8,
+    {GL_RG,   GL_BYTE,          GL_RG8_SNORM},     // HdFormatSNorm8Vec2,
+    {GL_RGB,  GL_BYTE,          GL_RGB8_SNORM},    // HdFormatSNorm8Vec3,
+    {GL_RGBA, GL_BYTE,          GL_RGBA8_SNORM},   // HdFormatSNorm8Vec4,
 
-    {GL_RGB,  GL_UNSIGNED_BYTE, GL_RGB8},    // HdFormatR8G8B8UNorm,
-    {GL_RGB,  GL_BYTE,          GL_RGB8},    // HdFormatR8G8B8SNorm,
+    {GL_RED,  GL_FLOAT,         GL_R32F},    // HdFormatFloat32,
+    {GL_RG,   GL_FLOAT,         GL_RG32F},   // HdFormatFloat32Vec2,
+    {GL_RGB,  GL_FLOAT,         GL_RGB32F},  // HdFormatFloat32Vec3,
+    {GL_RGBA, GL_FLOAT,         GL_RGBA32F}, // HdFormatFloat32Vec4,
 
-    {GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8},   // HdFormatR8G8B8A8UNorm,
-    {GL_RGBA, GL_BYTE,          GL_RGBA8},   // HdFormatR8G8B8A8SNorm,
-
-    {GL_RED,  GL_FLOAT,         GL_R32F},    // HdFormatR32Float,
-
-    {GL_RG,   GL_FLOAT,         GL_RG32F},   // HdFormatR32G32Float,
-
-    {GL_RGB,  GL_FLOAT,         GL_RGB32F},  // HdFormatR32G32B32Float,
-
-    {GL_RGBA,  GL_FLOAT,        GL_RGBA32F}, // HdFormatR32G32B32A32Float,
+    {GL_RED,  GL_INT,           GL_R32I},    // HdFormatInt32,
+    {GL_RG,   GL_INT,           GL_RG32I},   // HdFormatInt32Vec2,
+    {GL_RGB,  GL_INT,           GL_RGB32I},  // HdFormatInt32Vec3,
+    {GL_RGBA, GL_INT,           GL_RGBA32I}, // HdFormatInt32Vec4,
 };
 static_assert(TfArraySize(FORMAT_DESC) ==  HdFormatCount, "FORMAT_DESC to HdFormat enum mismatch");
 
@@ -203,6 +203,7 @@ HdStGLConversions::GetWrap(HdWrap wrap)
         case HdWrapClamp : return GL_CLAMP_TO_EDGE;
         case HdWrapRepeat : return GL_REPEAT;
         case HdWrapBlack : return GL_CLAMP_TO_BORDER;
+        case HdWrapMirror : return GL_MIRRORED_REPEAT;
         case HdWrapUseMetaDict : return GL_REPEAT;
     }
 
@@ -247,12 +248,14 @@ HdStGLConversions::GetGLAttribType(HdType type)
     case HdTypeFloatVec2:
     case HdTypeFloatVec3:
     case HdTypeFloatVec4:
+    case HdTypeFloatMat3:
     case HdTypeFloatMat4:
         return GL_FLOAT;
     case HdTypeDouble:
     case HdTypeDoubleVec2:
     case HdTypeDoubleVec3:
     case HdTypeDoubleVec4:
+    case HdTypeDoubleMat3:
     case HdTypeDoubleMat4:
         return GL_DOUBLE;
     case HdTypeInt32_2_10_10_10_REV:
@@ -271,12 +274,14 @@ TF_DEFINE_PRIVATE_TOKENS(
     (vec2)
     (vec3)
     (vec4)
+    (mat3)
     (mat4)
 
     ((_double, "double"))
     (dvec2)
     (dvec3)
     (dvec4)
+    (dmat3)
     (dmat4)
 
     ((_int, "int"))
@@ -328,6 +333,8 @@ HdStGLConversions::GetGLSLTypename(HdType type)
         // Special case: treat as a vec4.
     case HdTypeFloatVec4:
         return _glTypeNames->vec4;
+    case HdTypeFloatMat3:
+        return _glTypeNames->mat3;
     case HdTypeFloatMat4:
         return _glTypeNames->mat4;
 
@@ -339,6 +346,8 @@ HdStGLConversions::GetGLSLTypename(HdType type)
         return _glTypeNames->dvec3;
     case HdTypeDoubleVec4:
         return _glTypeNames->dvec4;
+    case HdTypeDoubleMat3:
+        return _glTypeNames->dmat3;
     case HdTypeDoubleMat4:
         return _glTypeNames->dmat4;
     };

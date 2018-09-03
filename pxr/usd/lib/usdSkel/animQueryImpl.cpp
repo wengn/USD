@@ -29,7 +29,7 @@
 
 #include "pxr/usd/usdGeom/xformable.h"
 
-#include "pxr/usd/usdSkel/packedJointAnimation.h"
+#include "pxr/usd/usdSkel/animation.h"
 #include "pxr/usd/usdSkel/utils.h"
 
 
@@ -37,23 +37,28 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 // --------------------------------------------------
-// UsdSkel_PackedJointAnimationQuery
+// UsdSkel_SkelAnimationQueryImpl
 // --------------------------------------------------
 
 
-/// Animation query implementation for UsdSkelPackedJointAnimation primitives.
-class UsdSkel_PackedJointAnimationQueryImpl : public UsdSkel_AnimQueryImpl
+/// Animation query implementation for UsdSkelAnimation primitives.
+class UsdSkel_SkelAnimationQueryImpl : public UsdSkel_AnimQueryImpl
 {
 public:
-    UsdSkel_PackedJointAnimationQueryImpl(
-        const UsdSkelPackedJointAnimation& anim);
+    UsdSkel_SkelAnimationQueryImpl(const UsdSkelAnimation& anim);
 
-    virtual ~UsdSkel_PackedJointAnimationQueryImpl() {}
+    virtual ~UsdSkel_SkelAnimationQueryImpl() {}
 
     virtual UsdPrim GetPrim() const override { return _anim.GetPrim(); }
     
     virtual bool ComputeJointLocalTransforms(VtMatrix4dArray* xforms,
                                              UsdTimeCode time) const override;
+
+    virtual bool ComputeJointLocalTransformComponents(
+                     VtVec3fArray* translations,
+                     VtQuatfArray* rotations,
+                     VtVec3hArray* scales,
+                     UsdTimeCode time) const override;
 
     virtual bool
     GetJointTransformTimeSamples(const GfInterval& interval,
@@ -65,35 +70,33 @@ public:
     
     virtual bool JointTransformsMightBeTimeVarying() const override;
 
-    virtual bool TransformMightBeTimeVarying() const override;
-
-    virtual bool ComputeTransform(GfMatrix4d* xform,
-                                  UsdTimeCode time) const override;
+    virtual bool ComputeBlendShapeWeights(VtFloatArray* weights,
+                                          UsdTimeCode time) const override;
 
 
 private:
-    UsdSkelPackedJointAnimation _anim;
-    UsdAttributeQuery _translations, _rotations, _scales;
-    UsdGeomXformable::XformQuery _xformQuery;
+    UsdSkelAnimation _anim;
+    UsdAttributeQuery _translations, _rotations, _scales, _blendShapeWeights;
 };
 
 
-UsdSkel_PackedJointAnimationQueryImpl::UsdSkel_PackedJointAnimationQueryImpl(
-    const UsdSkelPackedJointAnimation& anim)
+UsdSkel_SkelAnimationQueryImpl::UsdSkel_SkelAnimationQueryImpl(
+    const UsdSkelAnimation& anim)
     : _anim(anim),
       _translations(anim.GetTranslationsAttr()),
       _rotations(anim.GetRotationsAttr()),
       _scales(anim.GetScalesAttr()),
-      _xformQuery(anim)
+      _blendShapeWeights(anim.GetBlendShapeWeightsAttr())
 {
     if(TF_VERIFY(anim)) {
         anim.GetJointsAttr().Get(&_jointOrder);
+        anim.GetBlendShapesAttr().Get(&_blendShapeOrder);
     }
 }
 
 
 bool
-UsdSkel_PackedJointAnimationQueryImpl::ComputeJointLocalTransforms(
+UsdSkel_SkelAnimationQueryImpl::ComputeJointLocalTransforms(
     VtMatrix4dArray* xforms,
     UsdTimeCode time) const
 {
@@ -103,22 +106,51 @@ UsdSkel_PackedJointAnimationQueryImpl::ComputeJointLocalTransforms(
     VtQuatfArray rotations;
     VtVec3hArray scales;
 
-    if(_translations.Get(&translations, time) &&
-       _rotations.Get(&rotations, time) &&
-       _scales.Get(&scales, time)) {
+    if(ComputeJointLocalTransformComponents(&translations, &rotations,
+                                            &scales, time)) {
 
-        if(UsdSkelMakeTransforms(translations, rotations, scales, xforms))
-            return true;
-
-        TF_WARN("%s -- failed composing transforms from components.",
-                _anim.GetPrim().GetPath().GetText());
+        if(UsdSkelMakeTransforms(translations, rotations, scales, xforms)) {
+            if(xforms->size() == _jointOrder.size()) {
+                return true;
+            } else {
+                if(xforms->size() == 0) {
+                    // XXX: If the size of all components was zero, we
+                    // infer that the arrays were *intentionally* authored as
+                    // empty, to nullify the animation. Since this is 
+                    // suspected to be intentional, we emit no warning.
+                    return false;
+                }
+                TF_WARN("%s -- size of transform component arrays [%zu] "
+                        "!= joint order size [%zu].",
+                        _anim.GetPrim().GetPath().GetText(),
+                        xforms->size(), _jointOrder.size());
+            }
+        } else {
+            TF_WARN("%s -- failed composing transforms from components.",
+                    _anim.GetPrim().GetPath().GetText());
+        }
     }
     return false;
 }
 
 
 bool
-UsdSkel_PackedJointAnimationQueryImpl::GetJointTransformTimeSamples(
+UsdSkel_SkelAnimationQueryImpl::ComputeJointLocalTransformComponents(
+    VtVec3fArray* translations,
+    VtQuatfArray* rotations,
+    VtVec3hArray* scales,
+    UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+
+    return _translations.Get(translations, time) &&
+           _rotations.Get(rotations, time) &&
+           _scales.Get(scales, time);
+}
+
+
+bool
+UsdSkel_SkelAnimationQueryImpl::GetJointTransformTimeSamples(
     const GfInterval& interval,
     std::vector<double>* times) const
 {
@@ -129,7 +161,7 @@ UsdSkel_PackedJointAnimationQueryImpl::GetJointTransformTimeSamples(
 }
 
 bool
-UsdSkel_PackedJointAnimationQueryImpl::GetJointTransformAttributes(
+UsdSkel_SkelAnimationQueryImpl::GetJointTransformAttributes(
     std::vector<UsdAttribute>* attrs) const
 {
     attrs->push_back(_translations.GetAttribute());
@@ -140,7 +172,7 @@ UsdSkel_PackedJointAnimationQueryImpl::GetJointTransformAttributes(
 
 
 bool
-UsdSkel_PackedJointAnimationQueryImpl::JointTransformsMightBeTimeVarying() const
+UsdSkel_SkelAnimationQueryImpl::JointTransformsMightBeTimeVarying() const
 {
     return _translations.ValueMightBeTimeVarying() ||
            _rotations.ValueMightBeTimeVarying() ||
@@ -149,18 +181,12 @@ UsdSkel_PackedJointAnimationQueryImpl::JointTransformsMightBeTimeVarying() const
 
 
 bool
-UsdSkel_PackedJointAnimationQueryImpl::TransformMightBeTimeVarying() const
-{
-    return _xformQuery.TransformMightBeTimeVarying();
-}
-
-
-bool
-UsdSkel_PackedJointAnimationQueryImpl::ComputeTransform(GfMatrix4d* xform,
-                                                        UsdTimeCode time) const
+UsdSkel_SkelAnimationQueryImpl::ComputeBlendShapeWeights(
+    VtFloatArray* weights,
+    UsdTimeCode time) const
 {
     if(TF_VERIFY(_anim, "PackedJointAnimation schema object is invalid.")) {
-        return _xformQuery.GetLocalTransformation(xform, time);
+        return _blendShapeWeights.Get(weights, time);
     }
     return false;
 }
@@ -174,19 +200,11 @@ UsdSkel_PackedJointAnimationQueryImpl::ComputeTransform(GfMatrix4d* xform,
 UsdSkel_AnimQueryImplRefPtr
 UsdSkel_AnimQueryImpl::New(const UsdPrim& prim)
 {
-    if(prim.IsA<UsdSkelPackedJointAnimation>()) {
-        return TfCreateRefPtr(
-            new UsdSkel_PackedJointAnimationQueryImpl(
-                UsdSkelPackedJointAnimation(prim)));
+    if(prim.IsA<UsdSkelAnimation>()) {
+        return TfCreateRefPtr(new UsdSkel_SkelAnimationQueryImpl(
+                                  UsdSkelAnimation(prim)));
     }
     return nullptr;
-}
-
-
-bool
-UsdSkel_AnimQueryImpl::IsAnimPrim(const UsdPrim& prim)
-{
-    return prim.IsA<UsdSkelPackedJointAnimation>();
 }
 
 

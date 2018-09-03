@@ -26,13 +26,14 @@
 
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/fileFormat.h"
-#include "pxr/usd/sdf/layerBase.h"
+#include "pxr/usd/sdf/assetPathResolver.h"
 #include "pxr/usd/sdf/data.h"
-#include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/fileFormatRegistry.h"
+#include "pxr/usd/sdf/layer.h"
+#include "pxr/usd/sdf/layerBase.h"
 
 #include "pxr/usd/ar/resolver.h"
-#include "pxr/base/tracelite/trace.h"
+#include "pxr/base/trace/trace.h"
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -201,6 +202,19 @@ SdfFileFormat::IsSupportedExtension(
         false : std::count(_extensions.begin(), _extensions.end(), ext);
 }
 
+bool 
+SdfFileFormat::IsPackage() const
+{
+    return false;
+}
+
+std::string 
+SdfFileFormat::GetPackageRootLayerPath(
+    const std::string& resolvedPath) const
+{
+    return std::string();
+}
+
 bool
 SdfFileFormat::WriteToFile(
     const SdfLayerBase*,
@@ -245,14 +259,13 @@ SdfFileFormat::GetFileExtension(
         return s;
     }
 
-    // XXX: if it is a dot file (e.g. .menva) we append a temp
+    // XXX: if it is a dot file (e.g. .sdf) we append a temp
     // name to retain behavior of specifier stripping.
     // this is in place for backwards compatibility
     std::string strippedExtension = (s[0] == '.' ? 
         "temp_file_name" + s : s);
 
-    std::string extension 
-        = ArGetResolver().GetExtension(strippedExtension);
+    std::string extension = Sdf_GetExtension(strippedExtension);
        
     return extension.empty() ? s : extension;
 }
@@ -302,29 +315,9 @@ SdfFileFormat::_IssueNewLayerFailError(SdfLayerBaseRefPtr const &l,
 }
 
 void
-SdfFileFormat::_SwapLayerData(
-    const SdfLayerHandle& layer,
-    SdfAbstractDataRefPtr& data)
-{
-    layer->_SwapData(data);
-}
-
-void
 SdfFileFormat::_SetLayerData(
     const SdfLayerHandle& layer,
-    const SdfAbstractDataPtr& data)
-{
-    layer->_SetData(data);
-}
-
-SdfAbstractDataConstPtr
-SdfFileFormat::_GetLayerData(const SdfLayerHandle& layer)
-{
-    return layer->_GetData();
-}
-
-bool
-SdfFileFormat::_LayerIsLoadingAsNew(const SdfLayerHandle& layer)
+    SdfAbstractDataRefPtr& data)
 {
     // If layer initialization has not completed, then this
     // is being loaded as a new layer; otherwise we are loading
@@ -333,7 +326,19 @@ SdfFileFormat::_LayerIsLoadingAsNew(const SdfLayerHandle& layer)
     // Note that this is an optional::bool and we are checking if it has
     // been set, not what its held value is.
     //
-    return !layer->_initializationWasSuccessful;
+    const bool layerIsLoadingAsNew = !layer->_initializationWasSuccessful;
+    if (layerIsLoadingAsNew) {
+        layer->_SwapData(data);
+    }
+    else {
+        layer->_SetData(data);
+    }
+}
+
+SdfAbstractDataConstPtr
+SdfFileFormat::_GetLayerData(const SdfLayerHandle& layer)
+{
+    return layer->_GetData();
 }
 
 /* virtual */

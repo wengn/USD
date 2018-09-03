@@ -58,6 +58,13 @@ public:
     UsdSkelAnimMapper(const VtTokenArray& sourceOrder,
                       const VtTokenArray& targetOrder);
 
+    /// Construct a mapper for mapping data from \p sourceOrder to
+    /// \p targetOrder, each being arrays of size \p sourceOrderSize    
+    /// and \p targetOrderSize, respectively.
+    USDSKEL_API
+    UsdSkelAnimMapper(const TfToken* sourceOrder, size_t sourceOrderSize,
+                      const TfToken* targetOrder, size_t targetOrderSize);
+
     /// Typed remapping of data from \p source into \p target.
     /// The \p source array provides a run of \p elementSize elements for each
     /// path in the \\em sourceOrder. These elements are remapped and copied
@@ -74,7 +81,7 @@ public:
         static_assert(!std::is_pointer<T>::value, "");
         static_assert(SdfValueTypeTraits<T>::IsValueType, "");
         static_assert(!VtIsArray<T>::value, "");
-        return _Remap(source, target, elementSize);
+        return _Remap(source, target, elementSize, defaultValue);
     }
 
     /// Type-erased remapping of data from \p source into \p target.
@@ -113,6 +120,11 @@ public:
     /// No source elements of a null map are mapped to the target.
     USDSKEL_API
     bool IsNull() const;
+
+    /// Get the size of the output array that this mapper expects to
+    /// map data into.
+    USDSKEL_API
+    size_t size() const { return _targetSize; }
 
     bool operator==(const UsdSkelAnimMapper& o) const;
 

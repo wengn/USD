@@ -4,7 +4,7 @@ set(PXR_PACKAGE pcp)
 pxr_library(pcp
     LIBRARIES
         tf
-        tracelite
+        trace
         vt
         sdf
         work
@@ -104,6 +104,16 @@ pxr_test_scripts(
     testenv/testPcpRegressionBugs_bug92955.py
     testenv/testPcpRegressionBugs_bug101300.py
     testenv/testPcpCompositionResults.py
+)
+
+pxr_build_test(testPcpHardToReach
+    LIBRARIES
+        tf 
+        pcp 
+        sdf
+
+    CPPFILES
+        testenv/testPcpHardToReach.cpp
 )
 
 pxr_build_test(testPcpIterator
@@ -1319,6 +1329,11 @@ pxr_register_test(testPcpChanges
 pxr_register_test(testPcpDependencies
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpDependencies"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testPcpHardToReach
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpHardToReach"
     EXPECTED_RETURN_CODE 0
 )
 

@@ -26,11 +26,12 @@
 
 #include "pxrUsdMayaGL/batchRenderer.h"
 #include "pxrUsdMayaGL/renderParams.h"
-#include "pxrUsdMayaGL/shapeAdapter.h"
+#include "pxrUsdMayaGL/usdProxyShapeAdapter.h"
 #include "usdMaya/proxyShape.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3f.h"
+#include "pxr/imaging/hdx/intersector.h"
 
 #include <maya/MBoundingBox.h>
 #include <maya/MDagPath.h>
@@ -103,7 +104,7 @@ UsdMayaProxyDrawOverride::transform(
     MStatus status;
     const MMatrix transform = objPath.inclusiveMatrix(&status);
     if (status == MS::kSuccess) {
-        const_cast<PxrMayaHdShapeAdapter&>(_shapeAdapter).SetRootXform(
+        const_cast<PxrMayaHdUsdProxyShapeAdapter&>(_shapeAdapter).SetRootXform(
             GfMatrix4d(transform.matrix));
     }
 
@@ -147,7 +148,7 @@ UsdMayaProxyDrawOverride::prepareForDraw(
     }
 
     if (!_shapeAdapter.Sync(
-            shape,
+            objPath,
             frameContext.getDisplayStyle(),
             MHWRender::MGeometryUtilities::displayStatus(objPath))) {
         return nullptr;
@@ -157,27 +158,22 @@ UsdMayaProxyDrawOverride::prepareForDraw(
 
     bool drawShape;
     bool drawBoundingBox;
-    PxrMayaHdRenderParams params =
-        _shapeAdapter.GetRenderParams(&drawShape, &drawBoundingBox);
+    _shapeAdapter.GetRenderParams(&drawShape, &drawBoundingBox);
 
     if (!drawBoundingBox && !drawShape) {
         // We weren't asked to do anything.
         return nullptr;
     }
 
-    MBoundingBox bounds;
-    MBoundingBox* boundsPtr = nullptr;
+    MBoundingBox boundingBox;
+    MBoundingBox* boundingBoxPtr = nullptr;
     if (drawBoundingBox) {
         // Only query for the bounding box if we're drawing it.
-        bounds = shape->boundingBox();
-        boundsPtr = &bounds;
+        boundingBox = shape->boundingBox();
+        boundingBoxPtr = &boundingBox;
     }
 
-    return UsdMayaGLBatchRenderer::GetInstance().CreateBatchDrawData(
-        oldData,
-        params,
-        drawShape,
-        boundsPtr);
+    return _shapeAdapter.GetMayaUserData(oldData, boundingBoxPtr);
 }
 
 #if MAYA_API_VERSION >= 201800
@@ -207,12 +203,6 @@ UsdMayaProxyDrawOverride::userSelect(
         return false;
     }
 
-    UsdMayaProxyShape* shape =
-        UsdMayaProxyShape::GetShapeAtDagPath(_shapeAdapter._shapeDagPath);
-    if (!shape) {
-        return false;
-    }
-
     const unsigned int displayStyle = context.getDisplayStyle();
     const MHWRender::DisplayStatus displayStatus =
         MHWRender::MGeometryUtilities::displayStatus(_shapeAdapter._shapeDagPath);
@@ -223,24 +213,29 @@ UsdMayaProxyDrawOverride::userSelect(
     // first time. We do not add it to the batch renderer though, since that
     // must have already been done to have caused the shape to be drawn and
     // become eligible for selection.
-    if (!_shapeAdapter.Sync(shape, displayStyle, displayStatus)) {
+    if (!_shapeAdapter.Sync(
+            _shapeAdapter._shapeDagPath, displayStyle, displayStatus)) {
         return false;
     }
 
-    GfVec3f batchHitPoint;
-    const bool didHit =
+    const HdxIntersector::HitSet* hitSet =
         UsdMayaGLBatchRenderer::GetInstance().TestIntersection(
             &_shapeAdapter,
             selectInfo,
             context,
-            selectInfo.singleSelection(),
-            &batchHitPoint);
+            selectInfo.singleSelection());
 
-    if (didHit) {
-        hitPoint = MPoint(batchHitPoint[0], batchHitPoint[1], batchHitPoint[2]);
+    const HdxIntersector::Hit* nearestHit =
+        UsdMayaGLBatchRenderer::GetNearestHit(hitSet);
+
+    if (!nearestHit) {
+        return false;
     }
 
-    return didHit;
+    const GfVec3f& gfHitPoint = nearestHit->worldSpaceHitPoint;
+    hitPoint = MPoint(gfHitPoint[0], gfHitPoint[1], gfHitPoint[2]);
+
+    return true;
 }
 
 #endif // MAYA_API_VERSION >= 201800

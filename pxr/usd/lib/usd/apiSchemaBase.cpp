@@ -24,7 +24,6 @@
 #include "pxr/usd/usd/apiSchemaBase.h"
 #include "pxr/usd/usd/schemaRegistry.h"
 #include "pxr/usd/usd/typed.h"
-#include "pxr/usd/usd/tokens.h"
 
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/sdf/assetPath.h"
@@ -38,11 +37,6 @@ TF_REGISTRY_FUNCTION(TfType)
         TfType::Bases< UsdSchemaBase > >();
     
 }
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _schemaTokens,
-    (APISchemaBase)
-);
 
 /* virtual */
 UsdAPISchemaBase::~UsdAPISchemaBase()
@@ -61,12 +55,9 @@ UsdAPISchemaBase::Get(const UsdStagePtr &stage, const SdfPath &path)
 }
 
 
-/* static */
-UsdAPISchemaBase
-UsdAPISchemaBase::_Apply(const UsdPrim &prim)
-{
-    return UsdAPISchemaBase::_ApplyAPISchema<UsdAPISchemaBase>(
-            prim, _schemaTokens->APISchemaBase);
+/* virtual */
+UsdSchemaType UsdAPISchemaBase::_GetSchemaType() const {
+    return UsdAPISchemaBase::schemaType;
 }
 
 /* static */
@@ -116,6 +107,8 @@ PXR_NAMESPACE_CLOSE_SCOPE
 // 'PXR_NAMESPACE_OPEN_SCOPE', 'PXR_NAMESPACE_CLOSE_SCOPE'.
 // ===================================================================== //
 // --(BEGIN CUSTOM CODE)--
+
+#include "pxr/usd/usd/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -187,6 +180,29 @@ UsdAPISchemaBase::_ApplyAPISchemaImpl(const UsdPrim &prim,
             "at path <%s>", apiName.GetText(), prim.GetPath().GetText());
         return UsdPrim();
     }
+}
+
+/* virtual */
+bool 
+UsdAPISchemaBase::_IsCompatible() const
+{
+    if (!UsdSchemaBase::_IsCompatible())
+        return false;
+
+    // This virtual function call tells us whether we're an applied 
+    // API schema. For applied API schemas, we'd like to check whether 
+    // the API schema has been applied properly on the prim.
+    if (IsAppliedAPISchema() && 
+        ! GetPrim()._HasAPI(_GetTfType(), /*validateSchemaType*/ false, 
+                            _instanceName)) {
+        return false;
+    }
+
+    if (IsMultipleApplyAPISchema() && _instanceName.IsEmpty()) {
+        return false;
+    }
+
+    return true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

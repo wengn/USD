@@ -25,6 +25,7 @@
 #include "pxr/imaging/glf/glContext.h"
 
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
+#include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdSt/drawTargetRenderPassState.h"
 #include "pxr/imaging/hd/renderPassState.h"
 
@@ -137,7 +138,7 @@ HdxDrawTargetRenderPass::Execute(
     glViewport(0, 0, resolution[0], resolution[1]);
 
     // Perform actual draw
-    _renderPass.Execute(renderPassState, HdTokens->geometry);
+    _renderPass.Execute(renderPassState, TfTokenVector());
 
     // restore viewport
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);

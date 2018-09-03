@@ -30,8 +30,9 @@
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
+#include "pxr/imaging/hd/renderBuffer.h"
 
-#include "pxr/imaging/hdSt/camera.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/glslfxShader.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
@@ -93,7 +94,16 @@ HdxRenderSetupTask::_Sync(HdTaskContext* ctx)
         SyncParams(params);
     }
 
+    SyncAttachments();
     SyncCamera();
+    SyncRenderPassState();
+}
+
+void
+HdxRenderSetupTask::SyncRenderPassState()
+{
+    _renderPassState->Sync(
+        GetDelegate()->GetRenderIndex().GetResourceRegistry());
 }
 
 void
@@ -120,6 +130,8 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
 {
     _renderPassState->SetOverrideColor(params.overrideColor);
     _renderPassState->SetWireframeColor(params.wireframeColor);
+    _renderPassState->SetMaskColor(params.maskColor);
+    _renderPassState->SetIndicatorColor(params.indicatorColor);
     _renderPassState->SetPointColor(params.pointColor);
     _renderPassState->SetPointSize(params.pointSize);
     _renderPassState->SetPointSelectedSize(params.pointSelectedSize);
@@ -158,6 +170,7 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
     _viewport = params.viewport;
     _renderTags = params.renderTags;
     _cameraId = params.camera;
+    _attachments = params.attachments;
 
     if (HdStRenderPassState* extendedState =
             dynamic_cast<HdStRenderPassState*>(_renderPassState.get())) {
@@ -166,21 +179,39 @@ HdxRenderSetupTask::SyncParams(HdxRenderTaskParams const &params)
 }
 
 void
+HdxRenderSetupTask::SyncAttachments()
+{
+    // Walk the attachments, resolving the render index references as they're
+    // encountered.
+    const HdRenderIndex &renderIndex = GetDelegate()->GetRenderIndex();
+    HdRenderPassAttachmentVector attachments = _attachments;
+    for (size_t i = 0; i < attachments.size(); ++i)
+    {
+        if (attachments[i].renderBuffer == nullptr) {
+            attachments[i].renderBuffer = static_cast<HdRenderBuffer*>(
+                renderIndex.GetBprim(HdPrimTypeTokens->renderBuffer,
+                attachments[i].renderBufferId));
+        }
+    }
+    _renderPassState->SetAttachments(attachments);
+}
+
+void
 HdxRenderSetupTask::SyncCamera()
 {
     const HdRenderIndex &renderIndex = GetDelegate()->GetRenderIndex();
-    const HdStCamera *camera = static_cast<const HdStCamera *>(
+    const HdCamera *camera = static_cast<const HdCamera *>(
         renderIndex.GetSprim(HdPrimTypeTokens->camera, _cameraId));
 
-    if (camera && _renderPassState) {
-        VtValue modelViewVt  = camera->Get(HdStCameraTokens->worldToViewMatrix);
-        VtValue projectionVt = camera->Get(HdStCameraTokens->projectionMatrix);
+    if (camera) {
+        VtValue modelViewVt  = camera->Get(HdCameraTokens->worldToViewMatrix);
+        VtValue projectionVt = camera->Get(HdCameraTokens->projectionMatrix);
         GfMatrix4d modelView = modelViewVt.Get<GfMatrix4d>();
         GfMatrix4d projection= projectionVt.Get<GfMatrix4d>();
 
         // If there is a window policy available in this camera
         // we will extract it and adjust the projection accordingly.
-        VtValue windowPolicy = camera->Get(HdStCameraTokens->windowPolicy);
+        VtValue windowPolicy = camera->Get(HdCameraTokens->windowPolicy);
         if (windowPolicy.IsHolding<CameraUtilConformWindowPolicy>()) {
             const CameraUtilConformWindowPolicy policy = 
                 windowPolicy.Get<CameraUtilConformWindowPolicy>();
@@ -189,15 +220,13 @@ HdxRenderSetupTask::SyncCamera()
                 _viewport[3] != 0.0 ? _viewport[2] / _viewport[3] : 1.0);
         }
 
-        const VtValue &vClipPlanes = camera->Get(HdStCameraTokens->clipPlanes);
+        const VtValue &vClipPlanes = camera->Get(HdCameraTokens->clipPlanes);
         const HdRenderPassState::ClipPlanesVector &clipPlanes =
             vClipPlanes.Get<HdRenderPassState::ClipPlanesVector>();
 
         // sync render pass state
         _renderPassState->SetCamera(modelView, projection, _viewport);
         _renderPassState->SetClipPlanes(clipPlanes);
-        _renderPassState->Sync(
-            GetDelegate()->GetRenderIndex().GetResourceRegistry());
     }
 }
 
@@ -206,18 +235,12 @@ HdxRenderSetupTask::_CreateOverrideShader()
 {
     static std::mutex shaderCreateLock;
 
-    while (!_overrideShader) {
+    if (!_overrideShader) {
         std::lock_guard<std::mutex> lock(shaderCreateLock);
-        {
-            if (!_overrideShader) {
-                GlfGLSLFXSharedPtr glslfx =
-                        GlfGLSLFXSharedPtr(
-                           new GlfGLSLFX(HdStPackageFallbackSurfaceShader()));
-
-                _overrideShader =
-                              HdStShaderCodeSharedPtr(
-                                        new HdStGLSLFXShader(glslfx));
-            }
+        if (!_overrideShader) {
+            _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
+                GlfGLSLFXSharedPtr(new GlfGLSLFX(
+                    HdStPackageFallbackSurfaceShader()))));
         }
     }
 }
@@ -231,6 +254,8 @@ std::ostream& operator<<(std::ostream& out, const HdxRenderTaskParams& pv)
     out << "RenderTask Params: (...) " 
         << pv.overrideColor << " " 
         << pv.wireframeColor << " " 
+        << pv.maskColor << " " 
+        << pv.indicatorColor << " " 
         << pv.pointColor << " "
         << pv.pointSize << " "
         << pv.pointSelectedSize << " "
@@ -251,8 +276,11 @@ std::ostream& operator<<(std::ostream& out, const HdxRenderTaskParams& pv)
         << pv.surfaceVisibility << " "
         << pv.camera << " "
         << pv.viewport << " ";
-        TF_FOR_ALL(rt, pv.renderTags) {
-            out << *rt << " ";
+        for (auto const& a : pv.attachments) {
+            out << a << " ";
+        }
+        for (auto const& rt : pv.renderTags) {
+            out << rt << " ";
         }
     return out;
 }
@@ -261,6 +289,8 @@ bool operator==(const HdxRenderTaskParams& lhs, const HdxRenderTaskParams& rhs)
 {
     return lhs.overrideColor           == rhs.overrideColor           &&
            lhs.wireframeColor          == rhs.wireframeColor          &&
+           lhs.maskColor               == rhs.maskColor               &&
+           lhs.indicatorColor          == rhs.indicatorColor          &&
            lhs.pointColor              == rhs.pointColor              &&
            lhs.pointSize               == rhs.pointSize               &&
            lhs.pointSelectedSize       == rhs.pointSelectedSize       &&
@@ -279,6 +309,7 @@ bool operator==(const HdxRenderTaskParams& lhs, const HdxRenderTaskParams& rhs)
            lhs.complexity              == rhs.complexity              &&
            lhs.hullVisibility          == rhs.hullVisibility          &&
            lhs.surfaceVisibility       == rhs.surfaceVisibility       &&
+           lhs.attachments             == rhs.attachments             &&
            lhs.camera                  == rhs.camera                  &&
            lhs.viewport                == rhs.viewport                &&
            lhs.renderTags              == rhs.renderTags;

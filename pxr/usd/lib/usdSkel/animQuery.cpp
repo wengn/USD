@@ -43,22 +43,37 @@ UsdSkelAnimQuery::GetPrim() const
 
 
 bool
-UsdSkelAnimQuery::ComputeTransform(GfMatrix4d* xform,
-                                       UsdTimeCode time) const
+UsdSkelAnimQuery::ComputeJointLocalTransforms(VtMatrix4dArray* xforms,
+                                              UsdTimeCode time) const
 {
     if(TF_VERIFY(IsValid(), "invalid anim query.")) {
-        return _impl->ComputeTransform(xform, time);
+        return _impl->ComputeJointLocalTransforms(xforms, time);
     }
     return false;
 }
 
 
 bool
-UsdSkelAnimQuery::ComputeJointLocalTransforms(VtMatrix4dArray* xforms,
-                                              UsdTimeCode time) const
+UsdSkelAnimQuery::ComputeJointLocalTransformComponents(
+    VtVec3fArray* translations,
+    VtQuatfArray* rotations,
+    VtVec3hArray* scales,
+    UsdTimeCode time) const
 {
     if(TF_VERIFY(IsValid(), "invalid anim query.")) {
-        return _impl->ComputeJointLocalTransforms(xforms, time);
+        return _impl->ComputeJointLocalTransformComponents(
+            translations, rotations, scales, time);
+    }
+    return false;
+}
+
+
+bool
+UsdSkelAnimQuery::ComputeBlendShapeWeights(VtFloatArray* weights,
+                                           UsdTimeCode time) const
+{
+    if(TF_VERIFY(IsValid(), "invalid anim query.")) {
+        return _impl->ComputeBlendShapeWeights(weights, time);
     }
     return false;
 }
@@ -104,21 +119,21 @@ UsdSkelAnimQuery::JointTransformsMightBeTimeVarying() const
 }
 
 
-bool
-UsdSkelAnimQuery::TransformMightBeTimeVarying() const
-{
-    if(TF_VERIFY(IsValid(), "invalid anim query.")) {
-        return _impl->TransformMightBeTimeVarying();
-    }
-    return false;
-}
-
-
 VtTokenArray
 UsdSkelAnimQuery::GetJointOrder() const
 {
     if(TF_VERIFY(IsValid(), "invalid anim query.")) {
         return _impl->GetJointOrder();
+    }
+    return VtTokenArray();
+}
+
+
+VtTokenArray
+UsdSkelAnimQuery::GetBlendShapeOrder() const
+{
+    if(TF_VERIFY(IsValid(), "invalid anim query.")) {
+        return _impl->GetBlendShapeOrder();
     }
     return VtTokenArray();
 }

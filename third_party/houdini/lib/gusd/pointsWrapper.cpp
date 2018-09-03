@@ -208,15 +208,6 @@ refine(GT_Refine& refiner, const GT_RefineParms* parms) const
 }
 
 
-bool GusdPointsWrapper::
-getUniqueID(int64& id) const
-{
-    static const int s_id = GT_Primitive::createPrimitiveTypeId();
-    id = s_id;
-    return true;
-}
-
-
 const char* GusdPointsWrapper::
 className() const
 {
@@ -258,7 +249,7 @@ doSoftCopy() const
 
 bool GusdPointsWrapper::isValid() const
 {
-    return m_usdPoints;
+    return static_cast<bool>(m_usdPoints);
 }
 
 bool GusdPointsWrapper::

@@ -95,7 +95,7 @@ public:
     TfTokenVector const &GetRenderTags();
 
     /// Return the render index
-    HdRenderIndex * const GetRenderIndex() const { return _renderIndex; }
+    HdRenderIndex* GetRenderIndex() const { return _renderIndex; }
 
     // ---------------------------------------------------------------------- //
     /// \name Synchronization
@@ -125,7 +125,6 @@ public:
     /// \name Optional API hooks for progressive rendering
     // ---------------------------------------------------------------------- //
 
-    virtual void ResetImage() {}
     virtual bool IsConverged() const { return true; }
 
 protected:

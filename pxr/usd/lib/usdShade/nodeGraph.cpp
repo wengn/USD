@@ -74,6 +74,11 @@ UsdShadeNodeGraph::Define(
         stage->DefinePrim(path, usdPrimTypeName));
 }
 
+/* virtual */
+UsdSchemaType UsdShadeNodeGraph::_GetSchemaType() const {
+    return UsdShadeNodeGraph::schemaType;
+}
+
 /* static */
 const TfType &
 UsdShadeNodeGraph::_GetStaticTfType()
@@ -127,8 +132,9 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-UsdShadeNodeGraph::operator UsdShadeConnectableAPI () const {
-    return UsdShadeConnectableAPI(GetPrim());
+UsdShadeNodeGraph::UsdShadeNodeGraph(const UsdShadeConnectableAPI &connectable)
+    : UsdShadeNodeGraph(connectable.GetPrim())
+{
 }
 
 UsdShadeConnectableAPI 
@@ -139,7 +145,7 @@ UsdShadeNodeGraph::ConnectableAPI() const
 
 UsdShadeOutput
 UsdShadeNodeGraph::CreateOutput(const TfToken& name,
-                             const SdfValueTypeName& typeName)
+                             const SdfValueTypeName& typeName) const
 {
     return UsdShadeConnectableAPI(GetPrim()).CreateOutput(name, typeName);
 }
@@ -156,9 +162,32 @@ UsdShadeNodeGraph::GetOutputs() const
     return UsdShadeConnectableAPI(GetPrim()).GetOutputs();
 }
 
+UsdShadeShader 
+UsdShadeNodeGraph::ComputeOutputSource(
+    const TfToken &outputName, 
+    TfToken *sourceName, 
+    UsdShadeAttributeType *sourceType) const
+{
+    UsdShadeOutput output = GetOutput(outputName); 
+    if (!output)
+        return UsdShadeShader();
+
+    UsdShadeConnectableAPI source;
+    if (output.GetConnectedSource(&source, sourceName, sourceType)) {
+        // XXX: we're not doing anything to detect cycles here, which will lead
+        // to an infinite loop.
+        if (source.IsNodeGraph()) {
+            source = UsdShadeNodeGraph(source).ComputeOutputSource(*sourceName,
+                sourceName, sourceType);
+        }
+    }
+
+    return source;
+}
+
 UsdShadeInput
 UsdShadeNodeGraph::CreateInput(const TfToken& name,
-                              const SdfValueTypeName& typeName)
+                              const SdfValueTypeName& typeName) const
 {
     TfToken inputName = name;
     if (!UsdShadeUtils::WriteNewEncoding()) {

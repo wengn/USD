@@ -31,13 +31,18 @@ from pxr import Usd
 from pxr import UsdGeom
 from pxr import UsdShade
 
+try:
+    from pxr import UsdMaya
+except ImportError:
+    from pixar import UsdMaya
+
 from maya import cmds
 from maya import standalone
 
 
 class testUsdExportShadingModeDisplayColor(unittest.TestCase):
 
-    RED_COLOR = Gf.Vec3f(1.0, 0.0, 0.0)
+    RED_COLOR = 0.8 * Gf.Vec3f(1.0, 0.0, 0.0)
 
     @classmethod
     def setUpClass(cls):
@@ -78,7 +83,9 @@ class testUsdExportShadingModeDisplayColor(unittest.TestCase):
 
         meshDisplayColors = cubeMesh.GetDisplayColorPrimvar().Get()
         self.assertEqual(len(meshDisplayColors), 1)
-        self.assertTrue(Gf.IsClose(meshDisplayColors[0], self.RED_COLOR, 1e-6))
+        self.assertTrue(Gf.IsClose(meshDisplayColors[0], 
+            UsdMaya.ConvertMayaToLinear(self.RED_COLOR), 
+            1e-6))
 
         # Validate the Material prim bound to the Mesh prim.
         material = UsdShade.Material.GetBoundMaterial(cubePrim)
@@ -91,7 +98,9 @@ class testUsdExportShadingModeDisplayColor(unittest.TestCase):
 
         materialInput = material.GetInput('displayColor')
         matDisplayColor = materialInput.Get()
-        self.assertTrue(Gf.IsClose(matDisplayColor, self.RED_COLOR, 1e-6))
+        self.assertTrue(Gf.IsClose(matDisplayColor,
+            UsdMaya.ConvertMayaToLinear(self.RED_COLOR), 
+            1e-6))
 
         # Just verify that displayOpacity and transparency exist.
         materialInput = material.GetInput('displayOpacity')
@@ -101,27 +110,15 @@ class testUsdExportShadingModeDisplayColor(unittest.TestCase):
         self.assertTrue(materialInput)
 
         # Validate the surface shader that is connected to the material.
-        # XXX: Note that the expected number of outputs here is two rather than
-        # one, since we are still authoring the UsdRi Bxdf source in addition
-        # to the surface terminal for backwards compatibility. When consumers
-        # are updated to use the surface terminal instead, this test will have
-        # to be updated.
         materialOutputs = material.GetOutputs()
-        self.assertEqual(len(materialOutputs), 2)
-        materialOutput = material.GetOutput('surface')
+        self.assertEqual(len(materialOutputs), 4)
+        print self._stage.ExportToString()
+        materialOutput = material.GetOutput('ri:surface')
         (connectableAPI, outputName, outputType) = materialOutput.GetConnectedSource()
         self.assertEqual(outputName, 'out')
         shader = UsdShade.Shader(connectableAPI)
         self.assertTrue(shader)
         self.assertEqual(shader.GetPrim().GetName(), 'RedLambertSG_lambert')
-
-        # XXX: Validate the UsdRi Bxdf. This must also be removed when we no
-        # longer author it.
-        from pxr import UsdRi
-        usdRiMaterialAPI = UsdRi.MaterialAPI(material.GetPrim())
-        self.assertTrue(usdRiMaterialAPI)
-        bxdf = usdRiMaterialAPI.GetBxdf()
-        self.assertEqual(bxdf.GetPrim(), shader.GetPrim())
 
         shaderId = shader.GetIdAttr().Get()
         self.assertEqual(shaderId, 'PxrDiffuse')

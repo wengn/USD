@@ -61,6 +61,11 @@ UsdGeomMotionAPI::Get(const UsdStagePtr &stage, const SdfPath &path)
 }
 
 
+/* virtual */
+UsdSchemaType UsdGeomMotionAPI::_GetSchemaType() const {
+    return UsdGeomMotionAPI::schemaType;
+}
+
 /* static */
 UsdGeomMotionAPI
 UsdGeomMotionAPI::Apply(const UsdPrim &prim)

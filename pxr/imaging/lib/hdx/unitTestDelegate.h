@@ -53,8 +53,6 @@ _BuildArray(T values[], int numValues)
 class Hdx_UnitTestDelegate : public HdSceneDelegate
 {
 public:
-    enum Interpolation { VERTEX, UNIFORM, CONSTANT, FACEVARYING, VARYING };
-
     Hdx_UnitTestDelegate(HdRenderIndex *renderIndex);
 
     void SetRefineLevel(int level);
@@ -121,7 +119,7 @@ public:
                  VtIntArray const &verts,
                  PxOsdSubdivTags const &subdivTags,
                  VtValue const &color,
-                 Interpolation colorInterpolation,
+                 HdInterpolation colorInterpolation,
                  bool guide=false,
                  SdfPath const &instancerId=SdfPath(),
                  TfToken const &scheme=PxOsdOpenSubdivTokens->catmark,
@@ -132,7 +130,7 @@ public:
                  SdfPath const &instancerId=SdfPath(),
                  TfToken const &scheme=PxOsdOpenSubdivTokens->catmark,
                  VtValue const &color = VtValue(GfVec4f(1,1,1,1)),
-                 Interpolation colorInterpolation = CONSTANT);
+                 HdInterpolation colorInterpolation = HdInterpolationConstant);
 
     void AddGrid(SdfPath const &id, GfMatrix4d const &transform,
                  bool guide=false, SdfPath const &instancerId=SdfPath());
@@ -151,20 +149,19 @@ public:
     virtual bool GetVisible(SdfPath const& id);
     virtual HdMeshTopology GetMeshTopology(SdfPath const& id);
     virtual VtValue Get(SdfPath const& id, TfToken const& key);
-    virtual TfTokenVector GetPrimVarVertexNames(SdfPath const& id);
-    virtual TfTokenVector GetPrimVarConstantNames(SdfPath const& id);
-    virtual TfTokenVector GetPrimVarInstanceNames(SdfPath const &id);
-    virtual TfTokenVector GetPrimVarUniformNames(SdfPath const& id);
-    virtual TfTokenVector GetPrimVarFacevaryingNames(SdfPath const& id);
+    virtual HdPrimvarDescriptorVector
+        GetPrimvarDescriptors(SdfPath const& id, 
+                              HdInterpolation interpolation) override;
     virtual VtIntArray GetInstanceIndices(SdfPath const& instancerId,
                                           SdfPath const& prototypeId);
 
     virtual GfMatrix4d GetInstancerTransform(SdfPath const& instancerId,
                                              SdfPath const& prototypeId);
-    virtual int GetRefineLevel(SdfPath const& id);
+    virtual HdDisplayStyle GetDisplayStyle(SdfPath const& id) override;
     virtual TfToken GetReprName(SdfPath const &id);
 
 
+    virtual SdfPath GetMaterialId(SdfPath const &rprimId);
     virtual std::string GetSurfaceShaderSource(SdfPath const &shaderId);
     virtual std::string GetDisplacementShaderSource(SdfPath const &shaderId);
     virtual HdMaterialParamVector GetMaterialParams(SdfPath const &shaderId);
@@ -184,7 +181,7 @@ private:
               VtIntArray const &verts,
               PxOsdSubdivTags const &subdivTags,
               VtValue const &color,
-              Interpolation colorInterpolation,
+              HdInterpolation colorInterpolation,
               bool guide,
               bool doubleSided) :
             scheme(scheme), orientation(orientation),
@@ -202,7 +199,7 @@ private:
         VtIntArray verts;
         PxOsdSubdivTags subdivTags;
         VtValue color;
-        Interpolation colorInterpolation;
+        HdInterpolation colorInterpolation;
         bool guide;
         bool doubleSided;
         TfToken reprName;

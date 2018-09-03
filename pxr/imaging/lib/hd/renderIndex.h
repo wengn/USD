@@ -338,7 +338,7 @@ public:
     void RemoveBprim(TfToken const& typeId, SdfPath const &id);
 
     HD_API
-    HdBprim const *GetBprim(TfToken const& typeId, SdfPath const &id) const;
+    HdBprim *GetBprim(TfToken const& typeId, SdfPath const &id) const;
 
     /// Returns the subtree rooted under the given path for the given bprim
     /// type.
@@ -349,35 +349,6 @@ public:
     /// Returns the fallback prim for the Bprim of the given type.
     HD_API
     HdBprim *GetFallbackBprim(TfToken const& typeId) const;
-
-    // ---------------------------------------------------------------------- //
-    /// \name ExtComputation Support
-    // ---------------------------------------------------------------------- //
-
-    /// Insert an ExtComputation into index
-    HD_API
-    void InsertExtComputation(HdSceneDelegate* delegate,
-                              SdfPath const &id);
-
-    /// Remove an ExtComputation from index
-    HD_API
-    void RemoveExtComputation(SdfPath const& id);
-
-    /// Returns true if ExtComputation \p id exists in index.
-    bool HasExtComputation(SdfPath const& id) {
-        return _extComputationMap.find(id) != _extComputationMap.end();
-    }
-
-    /// Returns the ExtComputation of id
-    HD_API
-    HdExtComputation const *GetExtComputation(SdfPath const &id) const;
-
-    /// Query function to look up a computation and its delegate
-    HD_API
-    void GetExtComputationInfo(SdfPath const &id,
-                               HdExtComputation **computation,
-                               HdSceneDelegate **sceneDelegate);
-
 
     // ---------------------------------------------------------------------- //
     /// \name Render Delegate
@@ -439,13 +410,6 @@ private:
         HdRprim         *rprim;
     };
 
-    typedef std::unique_ptr<HdExtComputation> HdExtComputationPtr;
-    struct _ExtComputationInfo {
-        HdSceneDelegate     *sceneDelegate;
-        HdExtComputationPtr  extComputation;
-    };
-
-
     typedef TfHashMap<SdfPath, HdTaskSharedPtr, SdfPath::Hash> _TaskMap;
     typedef TfHashMap<SdfPath, _RprimInfo, SdfPath::Hash> _RprimMap;
     typedef std::map<uint32_t, SdfPath> _RprimPrimIDMap;
@@ -468,12 +432,6 @@ private:
 
     typedef TfHashMap<SdfPath, HdInstancer*, SdfPath::Hash> _InstancerMap;
     _InstancerMap _instancerMap;
-
-
-    typedef std::unordered_map<SdfPath, _ExtComputationInfo, SdfPath::Hash>
-                                                             _ExtComputationMap;
-    _ExtComputationMap _extComputationMap;
-
 
     // XXX: TO FIX Move
     typedef std::vector<HdDirtyListSharedPtr> _DirtyListVector;

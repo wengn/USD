@@ -43,14 +43,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (rotate)
-    (scale)
-    (translate)
-);
-
 template <typename T>
 static VtArray<T>
 _BuildArray(T values[], int numValues)
@@ -97,7 +89,13 @@ HdSt_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
 #endif
 
     return HdTextureResourceSharedPtr(
-        new HdStSimpleTextureResource(texture, isPtex));
+        new HdStSimpleTextureResource(texture,
+                                      isPtex,
+                                      HdWrapUseMetaDict,
+                                      HdWrapUseMetaDict,
+                                      HdMinFilterNearestMipmapLinear,
+                                      HdMagFilterLinear,
+                                      0));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

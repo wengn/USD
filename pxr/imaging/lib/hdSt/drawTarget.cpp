@@ -25,10 +25,10 @@
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/drawTargetAttachmentDescArray.h"
 #include "pxr/imaging/hdSt/drawTargetTextureResource.h"
-#include "pxr/imaging/hdSt/camera.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
-#include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sprim.h"
@@ -73,7 +73,7 @@ HdStDrawTarget::Sync(HdSceneDelegate *sceneDelegate,
 
     TF_UNUSED(renderParam);
 
-    SdfPath const &id = GetID();
+    SdfPath const &id = GetId();
     if (!TF_VERIFY(sceneDelegate != nullptr)) {
         return;
     }
@@ -168,16 +168,6 @@ HdStDrawTarget::Sync(HdSceneDelegate *sceneDelegate,
 }
 
 // virtual
-VtValue
-HdStDrawTarget::Get(TfToken const &token) const
-{
-    // nothing here, since right now all draw target tasks accessing
-    // HdStDrawTarget perform downcast from Sprim To HdStDrawTarget
-    // and use the C++ interface (e.g. IsEnabled(), GetRenderPassState()).
-    return VtValue();
-}
-
-// virtual
 HdDirtyBits
 HdStDrawTarget::GetInitialDirtyBitsMask() const
 {
@@ -207,7 +197,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
         return false;
     }
 
-    const HdStCamera *camera = _GetCamera(renderIndex);
+    const HdCamera *camera = _GetCamera(renderIndex);
     if (camera == nullptr) {
         TF_WARN("Missing camera\n");
         return false;
@@ -347,10 +337,10 @@ HdStDrawTarget::_SetAttachments(
 }
 
 
-const HdStCamera *
+const HdCamera *
 HdStDrawTarget::_GetCamera(const HdRenderIndex &renderIndex) const
 {
-    return static_cast<const HdStCamera *>(
+    return static_cast<const HdCamera *>(
             renderIndex.GetSprim(HdPrimTypeTokens->camera, _cameraId));
 }
 
@@ -387,7 +377,7 @@ HdStDrawTarget::_RegisterTextureResource(
         sceneDelegate->GetRenderIndex().GetResourceRegistry();
 
     // Create Path for the texture resource
-    SdfPath resourcePath = GetID().AppendProperty(TfToken(name));
+    SdfPath resourcePath = GetId().AppendProperty(TfToken(name));
 
     // Ask delegate for an ID for this tex
     HdTextureResource::ID texID =

@@ -45,17 +45,13 @@ PXR_NAMESPACE_OPEN_SCOPE
     (color)                                     \
     (collection)                                \
     (computeShader)                             \
-    (constantPrimVars)                          \
     (cubic)                                     \
     (culledInstanceIndices)                     \
     (cullStyle)                                 \
     (doubleSided)                               \
-    (dispatchBuffer)                            \
+    (dispatchCount)                             \
+    (displayStyle)                              \
     (drawDispatch)                              \
-    (drawCommandIndex)                          \
-    (drawIndirect)                              \
-    (drawIndirectCull)                          \
-    (drawIndirectResult)                        \
     (drawingShader)                             \
     (drawingCoord0)                             \
     (drawingCoord1)                             \
@@ -64,6 +60,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (elementCount)                              \
     (extent)                                    \
     (faceColors)                                \
+    (full)                                      \
     (geometry)                                  \
     (guide)                                     \
     (hermite)                                   \
@@ -74,8 +71,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (instancer)                                 \
     (instancerTransform)                        \
     (instancerTransformInverse)                 \
-    (instancePrimVars)                          \
-    (instanceCountInput)                        \
     (instanceIndices)                           \
     (instanceIndexBase)                         \
     (instanceTransform)                         \
@@ -84,32 +79,29 @@ PXR_NAMESPACE_OPEN_SCOPE
     (layout)                                    \
     (leftHanded)                                \
     (linear)                                    \
+    (lightLink)                                 \
     (materialParams)                            \
     (nonperiodic)                               \
     (normals)                                   \
-    (packedNormals)                             \
     (params)                                    \
     (patchParam)                                \
     (periodic)                                  \
     (points)                                    \
     (pointsIndices)                             \
     (power)                                     \
-    (primVar)                                   \
+    (preview)                                   \
+    (primvar)                                   \
     (primID)                                    \
     (primitiveParam)                            \
     (proxy)                                     \
     (quadInfo)                                  \
-    (refineLevel)                               \
     (refined)                                   \
     (refinedWire)                               \
     (refinedWireOnSurf)                         \
     (renderTags)                                \
-    (ulocDrawCommandNumUints)                   \
-    (ulocResetPass)                             \
-    (ulocCullMatrix)                            \
-    (ulocDrawRangeNDC)                          \
     (rightHanded)                               \
     (segmented)                                 \
+    (shadowLink)                                \
     (smoothHull)                                \
     (subdivTags)                                \
     (taskState)                                 \
@@ -144,6 +136,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (gpuMemoryUsed)                             \
     (instBasisCurvesTopology)                   \
     (instBasisCurvesTopologyRange)              \
+    (instExtComputationDataRange)               \
     (instMeshTopology)                          \
     (instMeshTopologyRange)                     \
     (instPrimvarRange)                          \
@@ -176,19 +169,20 @@ PXR_NAMESPACE_OPEN_SCOPE
     (environmentMap)                            \
     (fragmentShader)                            \
     (geometryShader)                            \
+    (indicatorColor)                            \
     (lightingBlendAmount)                       \
-    (material)                                  \
     (overrideColor)                             \
+    (maskColor)                                 \
     (projectionMatrix)                          \
+    (pointColor)                                \
+    (pointSize)                                 \
+    (pointSelectedSize)                         \
     (tessControlShader)                         \
     (tessEvalShader)                            \
     (tessLevel)                                 \
     (viewport)                                  \
     (vertexShader)                              \
     (wireframeColor)                            \
-    (pointColor)                                \
-    (pointSize)                                 \
-    (pointSelectedSize)                         \
     (worldToViewMatrix)                         \
     (worldToViewInverseMatrix)
 
@@ -208,19 +202,86 @@ PXR_NAMESPACE_OPEN_SCOPE
     (material)                                  \
     /* Sprims Lights */                         \
     (simpleLight)                               \
+    (cylinderLight)                             \
+    (diskLight)                                 \
+    (distantLight)                              \
     (domeLight)                                 \
     (rectLight)                                 \
     (sphereLight)                               \
+    /* Sprims ExtComputations */                \
+    (extComputation)                            \
                                                 \
     /* Bprims */                                \
-    (texture)
+    (texture)                                   \
+    (renderBuffer)
+
+#define HD_PRIMVAR_ROLE_TOKENS                  \
+    ((none, ""))                                \
+    (color)                                     \
+    (vector)                                    \
+    (normal)                                    \
+    (point)                                     \
+    (pointsVisibility)                          \
+    (textureCoordinate)
+
+/* Schema for "Alternate Output Values" rendering,
+ * describing which values a renderpass should
+ * compute and write at render time.
+ */
+#define HD_AOV_TOKENS                           \
+    /* Standard rendering outputs */            \
+                                                \
+    /* HdAovTokens->color represents the final
+     * fragment RGBA color.
+     */                                         \
+    (color)                                     \
+    /* HdAovTokens->depth represents the clip-space
+     * depth of the final fragment.
+     */                                         \
+    (depth)                                     \
+    /* HdAovTokens->linearDepth represents the camera-space
+     * depth of the final fragment.
+     */                                         \
+    (linearDepth)                               \
+    /* ID rendering - these tokens represent the
+     * prim, instance, and subprim ids of the final
+     * fragment.
+     */                                         \
+    (primId)                                    \
+    (instanceId)                                \
+    (elementId)                                 \
+    (edgeId)                                    \
+    (pointId)                                   \
+    /* Geometric data */                        \
+    (Peye)                                      \
+    (Neye)                                      \
+    (patchCoord)                                \
+    (primitiveParam)                            \
+    /* Primvars:
+     *   The tokens don't try to enumerate primvars,
+     *   but instead provide an identifying namespace.
+     *   The "color" primvar is addressable as "primvar:color".
+     */                                         \
+    ((primvar, "primvar:"))                     \
+    /* Light path expressions:
+     *   Applicable only to raytracers, these tell
+     *   the renderer to output specific shading
+     *   components for specific classes of lightpath.
+     */                                         \
+    ((lpe, "lpe:"))
+
+HD_API
+TfToken HdAovTokensPrimvar(TfToken const& primvar);
+HD_API
+TfToken HdAovTokensLpe(TfToken const& lpe);
 
 TF_DECLARE_PUBLIC_TOKENS(HdTokens, HD_API, HD_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdPerfTokens, HD_API, HD_PERF_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdShaderTokens, HD_API, HD_SHADER_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdOptionTokens, HD_API, HD_OPTION_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdPrimTypeTokens, HD_API, HD_PRIMTYPE_TOKENS);
-
+TF_DECLARE_PUBLIC_TOKENS(HdPrimvarRoleTokens, HD_API, HD_PRIMVAR_ROLE_TOKENS);
+TF_DECLARE_PUBLIC_TOKENS(HdAovTokens, HD_API, HD_AOV_TOKENS);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

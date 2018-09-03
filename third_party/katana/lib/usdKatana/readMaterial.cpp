@@ -29,6 +29,7 @@
 #include "usdKatana/baseMaterialHelpers.h"
 
 #include "pxr/base/tf/stringUtils.h"
+#include "pxr/imaging/glf/glslfx.h"
 
 #include "pxr/usd/usdGeom/scope.h"
 
@@ -39,6 +40,7 @@
 #include "pxr/usd/usdRi/materialAPI.h"
 #include "pxr/usd/usdRi/risObject.h"
 #include "pxr/usd/usdRi/risOslPattern.h"
+#include "pxr/usd/usdRi/rslShader.h"
 #include "pxr/usd/usdUI/nodeGraphNodeAPI.h"
 
 #include <FnGeolibServices/FnAttributeFunctionUtil.h>
@@ -86,7 +88,8 @@ PxrUsdKatanaReadMaterial(
         bool flatten,
         const PxrUsdKatanaUsdInPrivateData& data,
         PxrUsdKatanaAttrMap& attrs,
-        const std::string& looksGroupLocation)
+        const std::string& looksGroupLocation,
+        const std::string& materialDestinationLocation)
 {
     UsdPrim prim = material.GetPrim();
     UsdStageRefPtr stage = prim.GetStage();
@@ -101,10 +104,13 @@ PxrUsdKatanaReadMaterial(
     const std::string& parentPrefix = (looksGroupLocation.empty()) ?
         data.GetUsdInArgs()->GetRootLocationPath() : looksGroupLocation;
     
-    std::string fullKatanaPath = 
-        PxrUsdKatanaUtils::ConvertUsdMaterialPathToKatLocation(
-            primPath, data);
-    if (!fullKatanaPath.empty()) {
+    std::string fullKatanaPath = !materialDestinationLocation.empty()
+            ? materialDestinationLocation
+            : PxrUsdKatanaUtils::ConvertUsdMaterialPathToKatLocation(
+                    primPath, data);
+
+    if (!fullKatanaPath.empty() &&
+            pystring::startswith(fullKatanaPath, parentPrefix)) {
         katanaPath = fullKatanaPath.substr(parentPrefix.size()+1);
 
         // these paths are relative in katana
@@ -112,6 +118,7 @@ PxrUsdKatanaReadMaterial(
             katanaPath = katanaPath.substr(1);
         }
     }
+
 
     attrs.set("material.katanaPath", FnKat::StringAttribute(katanaPath));
     attrs.set("material.usdPrimName", FnKat::StringAttribute(prim.GetName()));
@@ -196,7 +203,7 @@ _GatherShadingParameters(
         if (flatten || 
             !PxrUsdKatana_IsAttrValFromBaseMaterial(attr)) {
             paramsBuilder.set(inputId,
-                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue, true));
+                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue));
         }
     }
     
@@ -221,8 +228,7 @@ _GatherShadingParameters(
                 }
                 
                 paramsBuilder.set(attr.GetName().GetString(),
-                        PxrUsdKatanaUtils::ConvertVtValueToKatAttr(
-                                vtValue, true));
+                        PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue));
             }
         }
     }
@@ -258,105 +264,46 @@ _CreateShadingNode(
     GroupBuilder shdNodeAttr;
     bool validData = false;
 
-    if (UsdRiRslShader rslShaderObjectSchema = UsdRiRslShader(shadingNode))
-    {
-        validData = true;
-        SdfAssetPath sloAssetPath;
-        rslShaderObjectSchema.GetSloPathAttr().Get(
-            &sloAssetPath, currentTime);
-        
-        // add to shader list
-        shdNodeAttr.set("type", FnKat::StringAttribute(
-            sloAssetPath.GetAssetPath()));
-
-        GroupBuilder paramsBuilder;
-        GroupBuilder connectionsBuilder;
-
-        _GatherShadingParameters(rslShaderObjectSchema, handle, currentTime,
-            nodesBuilder, paramsBuilder, 
-            interfaceBuilder, connectionsBuilder, targetName, flatten);
-
-        // if no content, don't bother creating the group.
-        FnKat::GroupAttribute paramsAttr = paramsBuilder.build();
-        if (paramsAttr.getNumberOfChildren() > 0) {
-            shdNodeAttr.set("parameters", paramsAttr);
-        }
-        FnKat::GroupAttribute connectionsAttr = connectionsBuilder.build();
-        if (connectionsAttr.getNumberOfChildren() > 0) {
-            shdNodeAttr.set("connections", connectionsAttr);
-        }
-    }
-    else if (UsdShadeShader shaderSchema = UsdShadeShader(shadingNode)) {
+    if (UsdShadeShader shaderSchema = UsdShadeShader(shadingNode)) {
         validData = true;
         SdfAssetPath fileAssetPath;
 
-        UsdRiRisOslPattern oslSchema(shadingNode);
-        UsdRiRisObject risObjectSchema(shadingNode);
-        if (oslSchema) {
-            // Katana handles osl shaders a bit better than simply
-            // using PxrOsl pattern. Convert to katana osl node.
-            oslSchema.GetOslPathAttr().Get(
-                &fileAssetPath, currentTime);
-            if (flatten ||
-                !PxrUsdKatana_IsAttrValFromBaseMaterial(
-                oslSchema.GetOslPathAttr())) {
-                std::string typeValue = fileAssetPath.GetAssetPath();
-                if (!pystring::endswith(typeValue, ".oso"))
-                {
-                    typeValue = "osl:" + typeValue;
-                }
-                shdNodeAttr.set("type", FnKat::StringAttribute(typeValue));
-            }
-        }
-        else if (risObjectSchema){
-            risObjectSchema.GetFilePathAttr().Get(
-                &fileAssetPath, currentTime);
-            if (flatten || 
-                !PxrUsdKatana_IsAttrValFromBaseMaterial(
-                risObjectSchema.GetFilePathAttr())) {
-                shdNodeAttr.set("type", FnKat::StringAttribute(
-                    fileAssetPath.GetAssetPath()));
-            }
-        } 
-        else {
+        // only use the fallback OSL test if the targetName is "prman" as
+        // it will issue benign but confusing errors to the shell for
+        // display shaders
+        if (targetName == "prman")
+        {
+            TfToken id;
+            shaderSchema.GetIdAttr().Get(&id, currentTime);
+            std::string oslIdString = id.GetString();
             
-            // only use the fallback OSL test if the targetName is "prman" as
-            // it will issue benign but confusing errors to the shell for
-            // display shaders
-            if (targetName == "prman")
+            if (!pystring::endswith(oslIdString, ".oso"))
             {
-                TfToken id;
-                shaderSchema.GetIdAttr().Get(&id, currentTime);
-                std::string oslIdString = id.GetString();
-                
-                if (!pystring::endswith(oslIdString, ".oso"))
-                {
-                    oslIdString = "osl:" + oslIdString;
-                }
-                
-                FnKat::StringAttribute oslIdAttr = FnKat::StringAttribute(oslIdString);
-                FnAttribute::GroupAttribute shaderInfoAttr = 
-                         FnGeolibServices::FnAttributeFunctionUtil::run(
-                                 "PRManGetShaderParameterInfo", oslIdAttr);
-                if (shaderInfoAttr.isValid()) 
-                    shdNodeAttr.set("type", oslIdAttr);
-                else 
-                    shdNodeAttr.set(
-                        "type", FnKat::StringAttribute(id.GetString()));
+                oslIdString = "osl:" + oslIdString;
             }
-            else
-            {
-                TfToken id;
-                shaderSchema.GetIdAttr().Get(&id, currentTime);
+            
+            FnKat::StringAttribute oslIdAttr = FnKat::StringAttribute(oslIdString);
+            FnAttribute::GroupAttribute shaderInfoAttr = 
+                        FnGeolibServices::FnAttributeFunctionUtil::run(
+                                "PRManGetShaderParameterInfo", oslIdAttr);
+            if (shaderInfoAttr.isValid()) 
+                shdNodeAttr.set("type", oslIdAttr);
+            else 
                 shdNodeAttr.set(
-                        "type", FnKat::StringAttribute(id.GetString()));
-            }
+                    "type", FnKat::StringAttribute(id.GetString()));
+        }
+        else
+        {
+            TfToken id;
+            shaderSchema.GetIdAttr().Get(&id, currentTime);
+            shdNodeAttr.set(
+                    "type", FnKat::StringAttribute(id.GetString()));
         }
 
         GroupBuilder paramsBuilder;
         GroupBuilder connectionsBuilder;
 
-        _GatherShadingParameters(risObjectSchema, handle, currentTime,
+        _GatherShadingParameters(shaderSchema, handle, currentTime,
             nodesBuilder, paramsBuilder, 
             interfaceBuilder, connectionsBuilder, targetName, flatten);
 
@@ -432,18 +379,28 @@ _GetMaterialAttr(
     /////////////////
 
     // look for surface
-    UsdRiRslShader surfaceShader = riMaterialAPI.GetSurface(
+    UsdShadeShader surfaceShader = riMaterialAPI.GetSurface(
             /*ignoreBaseMaterial*/ not flatten);
     if (surfaceShader.GetPrim()) {
         std::string handle = _CreateShadingNode(
             surfaceShader.GetPrim(), currentTime,
             nodesBuilder, interfaceBuilder, "prman", flatten);
-        terminalsBuilder.set("prmanSurface",
-                             FnKat::StringAttribute(handle));
+    
+        // If the source shader type is an RslShader, then publish it 
+        // as a prmanSurface terminal. If not, fallback to the 
+        // prmanBxdf terminal.
+        UsdRiRslShader rslShader(surfaceShader.GetPrim());
+        if (rslShader) {
+            terminalsBuilder.set("prmanSurface",
+                                 FnKat::StringAttribute(handle));
+        } else {
+            terminalsBuilder.set("prmanBxdf",
+                                 FnKat::StringAttribute(handle));
+        }
     }
 
     // look for displacement
-    UsdRiRslShader displacementShader = riMaterialAPI.GetDisplacement(
+    UsdShadeShader displacementShader = riMaterialAPI.GetDisplacement(
             /*ignoreBaseMaterial*/ not flatten);
     if (displacementShader.GetPrim()) {
         string handle = _CreateShadingNode(
@@ -491,18 +448,6 @@ _GetMaterialAttr(
     // RIS SECTION
     /////////////////
     // this does not exclude the rsl part
-
-    // look for bxdf's
-    UsdRiRisBxdf bxdfShader = riMaterialAPI.GetBxdf(
-            /*ignoreBaseMaterial*/ not flatten);
-    if (bxdfShader.GetPrim()) {
-        string handle = _CreateShadingNode(
-            bxdfShader.GetPrim(), currentTime,
-            nodesBuilder, interfaceBuilder, "prman", flatten);
-
-        terminalsBuilder.set("prmanBxdf",
-                             FnKat::StringAttribute(handle));
-    }
 
     // XXX BEGIN This code is in support of Subgraph workflows
     //           and is currently necessary to match equivalent SGG behavior
@@ -564,40 +509,64 @@ _GetMaterialAttr(
     }
     // XXX END
     
+    bool foundGlslfxTerminal = false;
+    if (UsdShadeOutput glslfxOut = materialSchema.GetSurfaceOutput(
+                GlfGLSLFXTokens->glslfx)) {
+        if (flatten || 
+            !glslfxOut.IsSourceConnectionFromBaseMaterial()) 
+        {
+            UsdShadeConnectableAPI source;
+            TfToken sourceName;
+            UsdShadeAttributeType sourceType;
+            if (glslfxOut.GetConnectedSource(&source, &sourceName, 
+                                                &sourceType)) {
+                foundGlslfxTerminal = true;
+                string handle = _CreateShadingNode(
+                    source.GetPrim(), currentTime,
+                    nodesBuilder, interfaceBuilder, "display", flatten);
 
+                terminalsBuilder.set("displayBxdf",
+                                        FnKat::StringAttribute(handle));
+            }                                    
+        }
+    }
+
+    // XXX: This code is deprecated and should be removed soon, along with all 
+    // other uses of the deprecated usdHydra API.
+    // 
     // XXX, Because of relationship forwarding, there are possible name
     //      clashes with the standard prman shading.
-    if (UsdRelationship bxdfRel =
-        materialPrim.GetRelationship(UsdHydraTokens->displayLookBxdf))
-    {
-        if (flatten ||
-                !PxrUsdKatana_AreRelTargetsFromBaseMaterial(bxdfRel)) {
-            SdfPathVector targetPaths;
-            bxdfRel.GetForwardedTargets(&targetPaths);
-            
-            if (targetPaths.size() > 1) {
-                FnLogWarn("Multiple displayLook bxdf detected on look:" << 
-                    materialPrim.GetPath());
-            }
-            if (targetPaths.size() > 0) {
-                const SdfPath targetPath = targetPaths[0];
-                if (UsdPrim bxdfPrim =
-                    stage->GetPrimAtPath(targetPath)) {
-                    
-                    string handle = _CreateShadingNode(
-                        bxdfPrim, currentTime,
-                        nodesBuilder, interfaceBuilder, "display", flatten);
+    if (!foundGlslfxTerminal) {
+        if (UsdRelationship bxdfRel = materialPrim.GetRelationship(
+                    UsdHydraTokens->displayLookBxdf)) {
+            if (flatten ||
+                    !PxrUsdKatana_AreRelTargetsFromBaseMaterial(bxdfRel)) {
+                SdfPathVector targetPaths;
+                bxdfRel.GetForwardedTargets(&targetPaths);
+                
+                if (targetPaths.size() > 1) {
+                    FnLogWarn("Multiple displayLook bxdf detected on look:" << 
+                        materialPrim.GetPath());
+                }
+                if (targetPaths.size() > 0) {
+                    const SdfPath targetPath = targetPaths[0];
+                    if (UsdPrim bxdfPrim =
+                        stage->GetPrimAtPath(targetPath)) {
+                        
+                        string handle = _CreateShadingNode(
+                            bxdfPrim, currentTime,
+                            nodesBuilder, interfaceBuilder, "display", flatten);
 
-                    terminalsBuilder.set("displayBxdf",
-                                            FnKat::StringAttribute(handle));
-                } else {
-                    FnLogWarn("Bxdf does not exist at "
-                                << targetPath.GetString());
+                        terminalsBuilder.set("displayBxdf",
+                                                FnKat::StringAttribute(handle));
+                    } else {
+                        FnLogWarn("Bxdf does not exist at "
+                                    << targetPath.GetString());
+                    }
                 }
             }
         }
     }
-    
 
 
     // with the current implementation of ris, there are
@@ -736,7 +705,7 @@ _UnrollInterfaceFromPrim(const UsdPrim& prim,
         if (interfaceInput.GetAttr().Get(&attrVal) && !attrVal.IsEmpty()) {
             materialBuilder.set(
                     TfStringPrintf("parameters.%s", renamedParam.c_str()),
-                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(attrVal, true));
+                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(attrVal));
         }
 
         if (interfaceInputConsumers.count(interfaceInput) == 0) {

@@ -72,6 +72,9 @@ void wrapUsdSkelAnimMapper()
     using This = UsdSkelAnimMapper;
 
     class_<This,UsdSkelAnimMapperRefPtr>("AnimMapper", no_init)
+
+        .def(init<>())
+        
         .def(init<VtTokenArray,VtTokenArray>(
                  (arg("sourceOrder"), arg("targetOrder"))))
         .def("Remap", &_Remap,
@@ -90,5 +93,7 @@ void wrapUsdSkelAnimMapper()
         .def("IsSparse", &This::IsSparse)
 
         .def("IsNull", &This::IsNull)
+
+        .def("__len__", &This::size)
         ;
 }            

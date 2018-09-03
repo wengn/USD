@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hdSt/drawItem.h"
@@ -79,6 +80,7 @@ HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+    GLF_GROUP_FUNCTION();
 
     VtVec4fArray clipPlanes;
     TF_FOR_ALL(it, _clipPlanes) {
@@ -111,6 +113,12 @@ HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
             HdTupleType{HdTypeFloatVec4, 1});
         bufferSpecs.emplace_back(
             HdShaderTokens->wireframeColor,
+            HdTupleType{HdTypeFloatVec4, 1});
+        bufferSpecs.emplace_back(
+            HdShaderTokens->maskColor,
+            HdTupleType{HdTypeFloatVec4, 1});
+        bufferSpecs.emplace_back(
+            HdShaderTokens->indicatorColor,
             HdTupleType{HdTypeFloatVec4, 1});
         bufferSpecs.emplace_back(
             HdShaderTokens->pointColor,
@@ -176,6 +184,12 @@ HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
     sources.push_back(HdBufferSourceSharedPtr(
                           new HdVtBufferSource(HdShaderTokens->wireframeColor,
                                                VtValue(_wireframeColor))));
+    sources.push_back(HdBufferSourceSharedPtr(
+                          new HdVtBufferSource(HdShaderTokens->maskColor,
+                                               VtValue(_maskColor))));
+    sources.push_back(HdBufferSourceSharedPtr(
+                          new HdVtBufferSource(HdShaderTokens->indicatorColor,
+                                               VtValue(_indicatorColor))));
     sources.push_back(HdBufferSourceSharedPtr(
                           new HdVtBufferSource(HdShaderTokens->pointColor,
                                                VtValue(_pointColor))));
@@ -265,6 +279,8 @@ HdStRenderPassState::GetShaders() const
 void
 HdStRenderPassState::Bind()
 {
+    GLF_GROUP_FUNCTION();
+    
     // XXX: this states set will be refactored as hdstream PSO.
     
     // notify view-transform to the lighting shader to update its uniform block
@@ -342,6 +358,7 @@ HdStRenderPassState::Bind()
 void
 HdStRenderPassState::Unbind()
 {
+    GLF_GROUP_FUNCTION();
     // restore back to the GL defaults
 
     glDisable(GL_POLYGON_OFFSET_FILL);

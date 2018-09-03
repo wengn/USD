@@ -465,12 +465,11 @@ GusdGU_PackedUSD::getUsdTransform() const
         return m_transformCache;
     }
 
-    if( prim.IsA<UsdGeomXformable>() )
-    {
-        GusdUSD_XformCache::GetInstance().GetLocalToWorldTransform( 
-             prim, m_frame, m_transformCache );
+    if( GusdUSD_XformCache::GetInstance().GetLocalToWorldTransform(
+             prim, m_frame, m_transformCache ) ) {
         m_transformCacheValid = true;
-    }        
+    }
+
     return m_transformCache;
 }
 
@@ -782,6 +781,10 @@ GusdGU_PackedUSD::getInstanceKey(UT_Options& key) const
     if( !m_masterPathCacheValid ) {
         UsdPrim usdPrim = getUsdPrim();
 
+        if( !usdPrim ) {
+            return true;
+        }
+
         // Disambiguate masters of instances by including the stage pointer.
         // Sometimes instances are opened on different stages, so their
         // path will both be "/__Master_1" even if they are different prims.
@@ -837,30 +840,22 @@ GusdGU_PackedUSD::visibleGT() const
 }
 
 UsdPrim 
-GusdGU_PackedUSD::getUsdPrim(GusdUT_ErrorContext* err) const
+GusdGU_PackedUSD::getUsdPrim(UT_ErrorSeverity sev) const
 {
     if(m_usdPrim)
         return m_usdPrim;
 
     m_masterPathCacheValid = false;
 
+    SdfPath primPathWithoutVariants;
+    GusdStageBasicEditPtr edit;
+    GusdStageBasicEdit::GetPrimPathAndEditFromVariantsPath(
+        m_primPath, primPathWithoutVariants, edit);
+
     GusdStageCacheReader cache;
-    m_usdPrim =
-        cache.GetPrim(m_fileName, m_primPath.StripAllVariantSelections(),
-                      getStageEdit(), GusdStageOpts::LoadAll(), err).first;
+    m_usdPrim = cache.GetPrim(m_fileName, primPathWithoutVariants, edit,
+                              GusdStageOpts::LoadAll(), sev).first;
     return m_usdPrim;
-}
-
-
-GusdStageEditPtr
-GusdGU_PackedUSD::getStageEdit() const
-{
-    if(!m_primPath.ContainsPrimVariantSelection())
-        return GusdStageEditPtr();
-
-    auto* edit = new GusdStageBasicEdit;
-    edit->GetVariants().append(m_primPath);
-    return GusdStageEditPtr(edit);
 }
 
 

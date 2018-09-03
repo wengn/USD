@@ -36,7 +36,7 @@
 #include "pxr/usd/sdf/primSpec.h"
 #include "pxr/usd/sdf/relationshipSpec.h"
 #include "pxr/usd/sdf/schema.h"
-#include "pxr/base/tracelite/trace.h"
+#include "pxr/base/trace/trace.h"
 
 #include <algorithm>
 #include <set>
@@ -304,7 +304,7 @@ UsdRelationship::GetTargets(SdfPathVector* targets) const
     if (hasErrors) {
         stage->_ReportErrors(
             pcpErrors, otherErrors,
-            TfStringPrintf("Getting targets for relationship <%s>",
+            TfStringPrintf("getting targets for relationship <%s>",
                            GetPath().GetText()));
     }
 

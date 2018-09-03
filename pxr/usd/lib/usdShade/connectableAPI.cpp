@@ -61,12 +61,9 @@ UsdShadeConnectableAPI::Get(const UsdStagePtr &stage, const SdfPath &path)
 }
 
 
-/* static */
-UsdShadeConnectableAPI
-UsdShadeConnectableAPI::Apply(const UsdPrim &prim)
-{
-    return UsdAPISchemaBase::_ApplyAPISchema<UsdShadeConnectableAPI>(
-            prim, _schemaTokens->ConnectableAPI);
+/* virtual */
+UsdSchemaType UsdShadeConnectableAPI::_GetSchemaType() const {
+    return UsdShadeConnectableAPI::schemaType;
 }
 
 /* static */
@@ -172,8 +169,13 @@ UsdShadeConnectableAPI::IsNodeGraph() const
 
 /* virtual */
 bool 
-UsdShadeConnectableAPI::_IsCompatible(const UsdPrim &prim) const
+UsdShadeConnectableAPI::_IsCompatible() const
 {
+    if (!UsdAPISchemaBase::_IsCompatible() )
+        return false;
+
+    // Shaders and node-graphs are compatible with this API schema. 
+    // XXX: What if the typeName isn't known (eg, pure over)?
     return IsShader() || IsNodeGraph();
 }
 
@@ -609,12 +611,12 @@ UsdShadeConnectableAPI::GetConnectedSource(
             // If this is a terminal-style output, then allow connection 
             // to a prim.
             if (shadingProp.Is<UsdRelationship>()) {
-                return *source;
+                return static_cast<bool>(*source);
             }
         }
     }
 
-    return *source;
+    return static_cast<bool>(*source);
 }
 
 /* static  */
@@ -888,7 +890,7 @@ UsdShadeConnectableAPI::GetOutputs() const
 
 UsdShadeInput 
 UsdShadeConnectableAPI::CreateInput(const TfToken& name,
-                                     const SdfValueTypeName& typeName) const
+                                    const SdfValueTypeName& typeName) const
 {
     return UsdShadeInput(GetPrim(), name, typeName);
 }

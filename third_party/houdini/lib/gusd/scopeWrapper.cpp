@@ -138,13 +138,6 @@ redefine( const UsdStagePtr& stage,
     return true;
 }
 
-bool GusdScopeWrapper::
-getUniqueID(int64& id) const
-{
-    static const int s_id = GT_Primitive::createPrimitiveTypeId();
-    id = s_id;
-    return true;
-}
 
 const char* GusdScopeWrapper::
 className() const
@@ -186,7 +179,7 @@ doSoftCopy() const
 bool GusdScopeWrapper::
 isValid() const
 {
-    return m_usdScope;
+    return static_cast<bool>(m_usdScope);
 }
 
 bool GusdScopeWrapper::

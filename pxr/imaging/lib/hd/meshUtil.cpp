@@ -294,7 +294,13 @@ HdMeshUtil::ComputeTriangulatedFaceVaryingPrimvar(void const* source,
     }
 
     VtIntArray const &faceVertexCounts = _topology->GetFaceVertexCounts();
-    VtIntArray const &holeFaces = _topology->GetHoleIndices();
+
+    // Faces tagged as holes can be skipped over only when not refined.
+    VtIntArray const &holeFaces =
+        (_topology->GetRefineLevel() > 0)
+            ? VtIntArray()
+            : _topology->GetHoleIndices();
+
     bool flip = (_topology->GetOrientation() != HdTokens->rightHanded);
 
     switch (dataType) {
@@ -645,7 +651,7 @@ _Quadrangulate(SdfPath const& id,
     // original points + quadrangulated points
     VtArray<T> results(qi->pointsOffset + qi->numAdditionalPoints);
 
-    // copy original primVars
+    // copy original primvars
     T const *source = reinterpret_cast<T const*>(sourceUntyped);
     if (numElements >= qi->pointsOffset) {
         memcpy(results.data(), source, sizeof(T)*qi->pointsOffset);
@@ -658,7 +664,7 @@ _Quadrangulate(SdfPath const& id,
         }
     }
 
-    // compute quadrangulate primVars
+    // compute quadrangulate primvars
     int index = 0;
     // store quadrangulated points at end
     int dstIndex = qi->pointsOffset;
@@ -860,7 +866,13 @@ HdMeshUtil::ComputeQuadrangulatedFaceVaryingPrimvar(
     }
 
     VtIntArray const &faceVertexCounts = _topology->GetFaceVertexCounts();
-    VtIntArray const &holeFaces = _topology->GetHoleIndices();
+
+    // Faces tagged as holes can be skipped over only when not refined.
+    VtIntArray const &holeFaces =
+        (_topology->GetRefineLevel() > 0)
+            ? VtIntArray()
+            : _topology->GetHoleIndices();
+
     bool flip = (_topology->GetOrientation() != HdTokens->rightHanded);
 
     switch (dataType) {

@@ -1,6 +1,12 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hdSt)
 
+if (NOT ${PXR_ENABLE_GL_SUPPORT})
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
+    return()
+endif()
+
 if (OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK)
     add_definitions(-DOPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK)
 endif()
@@ -10,12 +16,11 @@ endif()
 
 pxr_library(hdSt
     LIBRARIES
-        cameraUtil
         garch
         glf
         hd
         tf
-        tracelite
+        trace
         ${GLEW_LIBRARY}
         ${OPENSUBDIV_LIBRARIES}
 
@@ -27,7 +32,6 @@ pxr_library(hdSt
         basisCurves
         bufferArrayRangeGL
         bufferResourceGL
-        camera
         commandBuffer
         computeShader
         copyComputation
@@ -38,9 +42,11 @@ pxr_library(hdSt
         drawTargetAttachmentDesc
         drawTargetAttachmentDescArray
         drawTargetRenderPassState
+        extComputation
         extCompGpuComputation
         extCompGpuComputationBufferSource
         extCompGpuComputationResource
+        extCompGpuPrimvarBufferSource
         fallbackLightingShader
         geometricShader
         glConversions
@@ -57,7 +63,6 @@ pxr_library(hdSt
         package
         persistentBuffer
         points
-        renderContextCaps
         renderDelegate
         renderPass
         renderPassShader

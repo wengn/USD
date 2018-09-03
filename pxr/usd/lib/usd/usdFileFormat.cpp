@@ -30,7 +30,7 @@
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/layerBase.h"
 
-#include "pxr/base/tracelite/trace.h"
+#include "pxr/base/trace/trace.h"
 
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/pathUtils.h"
@@ -296,6 +296,17 @@ UsdUsdFileFormat::_GetUnderlyingFileFormatForLayer(
 
     return underlyingFileFormat ?
         underlyingFileFormat : _GetDefaultFileFormat();
+}
+
+/* static */
+TfToken
+UsdUsdFileFormat::GetUnderlyingFormatForLayer(const SdfLayerBase *layerBase)
+{
+    if (layerBase->GetFileFormat()->GetFormatId() != UsdUsdFileFormatTokens->Id)
+        return TfToken();
+
+    auto fileFormat = _GetUnderlyingFileFormatForLayer(layerBase);
+    return _GetFormatArgumentForFileFormat(fileFormat);
 }
 
 bool

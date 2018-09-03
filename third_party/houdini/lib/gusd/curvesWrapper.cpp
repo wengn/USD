@@ -268,7 +268,7 @@ GusdCurvesWrapper::refine(
     VtVec3fArray usdPoints;
     pointsAttr.Get(&usdPoints, m_time);
 
-    GT_Int32Array* segEndPointIndicies = NULL;
+    UT_IntrusivePtr<GT_Int32Array> segEndPointIndicies;
     int numSegmentEndPoints = usdPoints.size();
     if( !refineForViewport ) {
 
@@ -600,15 +600,6 @@ _validateData(
         *detailAttrs = (*detailAttrs)->addAttribute( destName, data, true );
     }
 }
-}
-
-
-bool GusdCurvesWrapper::
-getUniqueID(int64& id) const
-{
-    static const int s_id = GT_Primitive::createPrimitiveTypeId();
-    id = s_id;
-    return true;
 }
 
 
