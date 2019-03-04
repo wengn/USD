@@ -336,6 +336,31 @@ _ResolveAssetPathRelativeToLayer(
     return ArGetResolver().Resolve(computedAssetPath);
 }
 
+static std::string
+_ResolveAssetPathRelativeToLayer(
+    int frame,
+    const SdfLayerHandle& anchor,
+    const std::string& assetPath)
+{
+    const std::string computedAssetPath =
+        _AnchorAssetPathRelativeToLayer(anchor, assetPath);
+
+    if (computedAssetPath.empty()) {
+        return computedAssetPath;
+    }
+
+    //naiqi's change
+    std::string modifiedAssetPath = computedAssetPath;
+    auto it = modifiedAssetPath.find("<f>");
+    if (it != std::string::npos)
+    {
+        modifiedAssetPath.replace(it, 3, std::to_string(frame));
+        return ArGetResolver().Resolve(modifiedAssetPath);
+    }
+
+    return ArGetResolver().Resolve(computedAssetPath);
+}
+
 // If anchorAssetPathsOnly is true, this function will only
 // update the authored assetPaths by anchoring them to the
 // anchor layer; it will not fill in the resolved path field.
@@ -362,6 +387,23 @@ _MakeResolvedAssetPathsImpl(const SdfLayerRefPtr &anchor,
     }
 }
 
+// Make a special case with file image sequence with format
+// ***.<f>.***
+static void
+_MakeResolvedAssetPathsImpl(int frame, const SdfLayerRefPtr &anchor,
+                            const ArResolverContext &context,
+                            SdfAssetPath *assetPaths,
+                            size_t numAssetPaths)
+{
+    ArResolverContextBinder binder(context);
+    for (size_t i = 0; i != numAssetPaths; ++i) {
+            assetPaths[i] = SdfAssetPath(
+                        assetPaths[i].GetAssetPath(),
+                        _ResolveAssetPathRelativeToLayer(
+                            frame, anchor, assetPaths[i].GetAssetPath()));
+    }
+}
+
 void
 UsdStage::_MakeResolvedAssetPaths(UsdTimeCode time,
                                   const UsdAttribute& attr,
@@ -373,6 +415,24 @@ UsdStage::_MakeResolvedAssetPaths(UsdTimeCode time,
     // resolve.
     auto anchor = _GetLayerWithStrongestValue(time, attr);
     if (anchor) {
+        if(attr.GetName().GetString() == "inputs:file")
+        {
+             double frame;
+             if(time.IsNumeric())
+             {
+                if (abs(time.GetValue()) < 0.000001)
+                    frame = 0.0;
+                else
+                    frame = time.GetValue();
+             }
+             else
+             {
+                 frame = GetStartTimeCode();
+             }
+
+             _MakeResolvedAssetPathsImpl(frame, anchor, GetPathResolverContext(), assetPaths, numAssetPaths);
+        }
+        else
         _MakeResolvedAssetPathsImpl(
             anchor, GetPathResolverContext(), assetPaths, numAssetPaths,
             anchorAssetPathsOnly);
@@ -391,13 +451,12 @@ UsdStage::_MakeResolvedAssetPaths(UsdTimeCode time,
         _MakeResolvedAssetPaths(
             time, attr, &assetPath, 1, anchorAssetPathsOnly);
         value->UncheckedSwap(assetPath);
-            
     }
     else if (value->IsHolding<VtArray<SdfAssetPath>>()) {
         VtArray<SdfAssetPath> assetPaths;
         value->UncheckedSwap(assetPaths);
         _MakeResolvedAssetPaths(
-            time, attr, assetPaths.data(), assetPaths.size(), 
+            time, attr, assetPaths.data(), assetPaths.size(),
             anchorAssetPathsOnly);
         value->UncheckedSwap(assetPaths);
     }
@@ -7215,6 +7274,17 @@ UsdStage::_ValueMightBeTimeVaryingFromResolveInfo(const UsdResolveInfo &info,
         return false;
     }
 
+    //Naiqi's change
+    if(attr.GetName().GetString() == "inputs:file")
+    {
+        //If attribute value path has "<f>", it needs to be treated specially
+       SdfAssetPath origPath;
+       if(attr.Get(&origPath,UsdTimeCode::EarliestTime()))
+       {
+         if(origPath.GetAssetPath().find("<f>") != std::string::npos)
+            return true;
+       }
+    }
     return _GetNumTimeSamplesFromResolveInfo(info, attr) > 1;
 }
 
