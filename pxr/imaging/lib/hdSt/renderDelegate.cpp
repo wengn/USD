@@ -72,7 +72,11 @@ const TfTokenVector HdStRenderDelegate::SUPPORTED_SPRIM_TYPES =
     HdPrimTypeTokens->material,
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->simpleLight,
-    HdPrimTypeTokens->sphereLight
+    HdPrimTypeTokens->sphereLight,
+    HdPrimTypeTokens->distantLight,
+    HdPrimTypeTokens->diskLight,
+    HdPrimTypeTokens->cylinderLight,
+    HdPrimTypeTokens->domeLight
 };
 
 const TfTokenVector HdStRenderDelegate::SUPPORTED_BPRIM_TYPES =
@@ -222,6 +226,14 @@ HdStRenderDelegate::CreateSprim(TfToken const& typeId,
         return new HdStLight(sprimId, HdPrimTypeTokens->sphereLight);
     } else if (typeId == HdPrimTypeTokens->rectLight) {
         return new HdStLight(sprimId, HdPrimTypeTokens->rectLight);
+    } else if (typeId == HdPrimTypeTokens->distantLight) {
+        return new HdStLight(sprimId, HdPrimTypeTokens->distantLight);
+    } else if (typeId == HdPrimTypeTokens->diskLight) {
+        return new HdStLight(sprimId, HdPrimTypeTokens->diskLight);
+    } else if (typeId == HdPrimTypeTokens->cylinderLight) {
+        return new HdStLight(sprimId, HdPrimTypeTokens->cylinderLight);
+    } else if (typeId == HdPrimTypeTokens->domeLight) {
+        return new HdStLight(sprimId, HdPrimTypeTokens->domeLight);
     } else  if (typeId == HdPrimTypeTokens->drawTarget) {
         return new HdStDrawTarget(sprimId);
     } else  if (typeId == HdPrimTypeTokens->extComputation) {
@@ -249,6 +261,18 @@ HdStRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
     } else if (typeId == HdPrimTypeTokens->rectLight) {
         return new HdStLight(SdfPath::EmptyPath(), 
                              HdPrimTypeTokens->rectLight);
+    } else if (typeId == HdPrimTypeTokens->distantLight) {
+        return new HdStLight(SdfPath::EmptyPath(),
+                             HdPrimTypeTokens->distantLight);
+    } else if (typeId == HdPrimTypeTokens->diskLight) {
+        return new HdStLight(SdfPath::EmptyPath(),
+                             HdPrimTypeTokens->diskLight);
+    } else if (typeId == HdPrimTypeTokens->cylinderLight) {
+        return new HdStLight(SdfPath::EmptyPath(),
+                             HdPrimTypeTokens->cylinderLight);
+    } else if (typeId == HdPrimTypeTokens->domeLight) {
+        return new HdStLight(SdfPath::EmptyPath(),
+                             HdPrimTypeTokens->domeLight);
     } else  if (typeId == HdPrimTypeTokens->drawTarget) {
         return new HdStDrawTarget(SdfPath::EmptyPath());
     } else  if (typeId == HdPrimTypeTokens->extComputation) {
