@@ -42,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 // -------------------------------------------------------------------------- //
 
 HdxRenderTask::HdxRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
-    : HdTask(id)
+    : HdxProgressiveTask(id)
     , _passes()
     , _setupTask()
 {
@@ -132,12 +132,6 @@ HdxRenderTask::Sync(HdSceneDelegate* delegate,
         }
     }
 
-    if (_setupTask) {
-        _setupTask->SyncAovBindings(delegate);
-        _setupTask->SyncCamera(delegate);
-        _setupTask->SyncRenderPassState(delegate);
-    }
-
     // sync render passes
     TF_FOR_ALL (it, _passes){
         HdRenderPassSharedPtr const &pass = (*it);
@@ -145,6 +139,15 @@ HdxRenderTask::Sync(HdSceneDelegate* delegate,
     }
 
     *dirtyBits = HdChangeTracker::Clean;
+}
+
+void
+HdxRenderTask::Prepare(HdTaskContext* ctx,
+                       HdRenderIndex* renderIndex)
+{
+    if (_setupTask) {
+        _setupTask->Prepare(ctx, renderIndex);
+    }
 }
 
 void

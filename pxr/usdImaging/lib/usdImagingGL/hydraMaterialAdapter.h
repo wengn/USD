@@ -54,9 +54,6 @@ public:
     USDIMAGINGGL_API
     virtual bool IsSupported(UsdImagingIndexProxy const* index) const override;
 
-    USDIMAGINGGL_API
-    virtual bool IsPopulatedIndirectly() override;
-
     // ---------------------------------------------------------------------- //
     /// \name Parallel Setup and Resolve
     // ---------------------------------------------------------------------- //
@@ -155,7 +152,8 @@ private:
         UsdPrim *displacementShaderPrim,
         SdfPathVector *textureIDs,
         TfTokenVector *primvars,
-        HdMaterialParamVector *materialParams) const;
+        HdMaterialParamVector *materialParams,
+        TfToken *materialTag) const;
 
     /// \brief Returns the information in the material graph
     /// (identified by \c SdfPath objects) that this \p shaderPrim uses.
@@ -163,7 +161,8 @@ private:
         UsdPrim const& shaderPrim,
         SdfPathVector *textureIDs,
         TfTokenVector *primvars,
-        HdMaterialParamVector *materialParams) const;
+        HdMaterialParamVector *materialParams,
+        TfToken *materialTag) const;
 
     /// \brief Returns the information in a legacy material graph
     /// (identified by \c SdfPath objects) that this \p shaderPrim uses.
@@ -171,7 +170,8 @@ private:
         UsdPrim const &shaderPrim,
         SdfPathVector *textureIDs,
         TfTokenVector *primvars,
-        HdMaterialParamVector *materialParams) const;
+        HdMaterialParamVector *materialParams,
+        TfToken *materialTag) const;
 
     /// \brief Returns the value of param \p paramName for \p shaderPrim.
     VtValue _GetMaterialParamValue(UsdPrim const& shaderPrim,

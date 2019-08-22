@@ -27,7 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdx/api.h"
 #include "pxr/imaging/hdx/version.h"
-#include "pxr/imaging/hd/task.h"
+#include "pxr/imaging/hdx/progressiveTask.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"  // for short-term compatibility.
 #include "pxr/imaging/hdSt/renderPassState.h"
 
@@ -62,7 +62,7 @@ typedef std::vector<HdRenderPassSharedPtr> HdRenderPassSharedPtrVector;
 /// setup task you run before the render task, you can change the render
 /// parameters without incurring a hydra sync or rebuilding any resources.
 ///
-class HdxRenderTask : public HdTask
+class HdxRenderTask : public HdxProgressiveTask
 {
 public:
     HDX_API
@@ -72,13 +72,18 @@ public:
     virtual ~HdxRenderTask();
 
     /// Hooks for progressive rendering (delegated to renderpasses).
-    bool IsConverged() const;
+    virtual bool IsConverged() const override;
 
     /// Sync the render pass resources
     HDX_API
     virtual void Sync(HdSceneDelegate* delegate,
                       HdTaskContext* ctx,
                       HdDirtyBits* dirtyBits) override;
+
+    /// Prepare the tasks resources
+    HDX_API
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override;
 
     /// Execute render pass task
     HDX_API

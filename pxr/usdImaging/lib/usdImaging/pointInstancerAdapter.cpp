@@ -73,6 +73,18 @@ UsdImagingPointInstancerAdapter::~UsdImagingPointInstancerAdapter()
 {
 }
 
+bool
+UsdImagingPointInstancerAdapter::ShouldCullChildren() const
+{
+    return true;
+}
+
+bool
+UsdImagingPointInstancerAdapter::IsInstancerAdapter() const
+{
+    return true;
+}
+
 SdfPath
 UsdImagingPointInstancerAdapter::Populate(UsdPrim const& prim, 
                             UsdImagingIndexProxy* index,
@@ -304,6 +316,17 @@ UsdImagingPointInstancerAdapter::_PopulatePrototype(
                 instancerChain));
 
         if (!instanceProxyPrim) {
+            range.set_begin(++iter);
+            continue;
+        }
+
+        // Skip population of non-imageable prims.
+        if (UsdImagingPrimAdapter::ShouldCullSubtree(instanceProxyPrim)) {
+            TF_DEBUG(USDIMAGING_INSTANCER).Msg("[Instance PI] Discovery of new "
+                "prims at or below <%s> pruned by prim type (%s)\n",
+                iter->GetPath().GetText(), iter->GetTypeName().GetText());
+            iter.PruneChildren();
+            range.set_begin(++iter);
             continue;
         }
 
@@ -320,17 +343,11 @@ UsdImagingPointInstancerAdapter::_PopulatePrototype(
                     "In order to instance this prim, put the prim under an "
                     "Xform, and instance the Xform parent.",
                     iter->GetPath().GetText());
+            range.set_begin(++iter);
             continue;
         }
 
         if (adapter) {
-            if (adapter->IsPopulatedIndirectly()) {
-                // If "IsPopulatedIndirectly", don't populate this from
-                // traversal.
-                range.set_begin(++iter);
-                continue;
-            }
-
             primCount++;
 
             //
@@ -376,7 +393,7 @@ UsdImagingPointInstancerAdapter::_PopulatePrototype(
                 protoPath = adapter->Populate(populatePrim, index, &ctx);
             }
 
-            if (adapter->ShouldCullChildren(*iter)) {
+            if (adapter->ShouldCullChildren()) {
                 iter.PruneChildren();
             }
 
@@ -546,7 +563,7 @@ UsdImagingPointInstancerAdapter::TrackVariability(UsdPrim const& prim,
 
         return;
     } else {
-        TfToken purpose = UsdGeomImageable(prim).ComputePurpose();
+        TfToken purpose = GetPurpose(prim);
         // Empty purpose means there is no opinion, fall back to default.
         if (purpose.IsEmpty())
             purpose = UsdGeomTokens->default_;
@@ -933,7 +950,8 @@ UsdImagingPointInstancerAdapter::UpdateForTime(UsdPrim const& prim,
             for (auto const &pv: primvars.GetPrimvars()) {
                 TfToken const& interp = pv.GetInterpolation();
                 if (interp != UsdGeomTokens->constant &&
-                    interp != UsdGeomTokens->uniform) {
+                    interp != UsdGeomTokens->uniform &&
+                    pv.HasAuthoredValue()) {
                     HdInterpolation interp = HdInterpolationInstance;
                     _ComputeAndMergePrimvar(
                         prim, cachePath, pv, time, valueCache, &interp);
@@ -1500,8 +1518,11 @@ UsdImagingPointInstancerAdapter::_UpdateDirtyBits(UsdPrim const& instancerPrim)
     {
         // When the instancer visibility doesn't vary over time, pre-cache
         // visibility to avoid fetching it on frame change.
+        // XXX: The usage of _GetTimeWithOffset here is super-sketch, but
+        // it avoids blowing up the inherited visibility cache... We should let
+        // this be initialized by the first UpdateForTime instead.
         instrData.visible = _GetInstancerVisible(instancerPrim.GetPath(),
-                                                 /*time doesn't matter*/1.0);
+            _GetTimeWithOffset(0.0));
     }
 
     // These _IsVarying calls are chained to short circuit as soon as we find
@@ -1888,6 +1909,25 @@ UsdImagingPointInstancerAdapter::PopulateSelection(
         added = true;
     }
     return added;
+}
+
+/*virtual*/
+HdVolumeFieldDescriptorVector
+UsdImagingPointInstancerAdapter::GetVolumeFieldDescriptors(
+    UsdPrim const& usdPrim,
+    SdfPath const &id,
+    UsdTimeCode time) const
+{
+    if (IsChildPath(id)) {
+        // Delegate to prototype adapter and USD prim.
+        _ProtoRprim const& rproto = _GetProtoRprim(usdPrim.GetPath(), id);
+        UsdPrim protoPrim = _GetProtoUsdPrim(rproto);
+        return rproto.adapter->GetVolumeFieldDescriptors(
+            protoPrim, id, time);
+    } else {
+        return UsdImagingPrimAdapter::GetVolumeFieldDescriptors(
+            usdPrim, id, time);
+    }
 }
 
 /*virtual*/
