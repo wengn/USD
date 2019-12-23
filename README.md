@@ -1,3 +1,4 @@
+
 Universal Scene Description
 ===========================
 
@@ -169,3 +170,7 @@ Contributing
 If you'd like to contribute to USD (and we appreciate the help!), please see
 the [Contributing](http://openusd.org/docs/Contributing-to-USD.html) page in the
 documentation for more information.
+
+
+This is our modified version of Pixar USD. 
+
