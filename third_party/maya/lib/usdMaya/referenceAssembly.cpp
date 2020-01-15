@@ -111,6 +111,7 @@ MObject UsdMayaReferenceAssembly::drawModeAttr;
 MObject UsdMayaReferenceAssembly::inStageDataAttr;
 MObject UsdMayaReferenceAssembly::inStageDataCachedAttr;
 MObject UsdMayaReferenceAssembly::outStageDataAttr;
+MObject UsdMayaReferenceAssembly::usdVariantsLayerAttr;
 std::vector<MObject> UsdMayaReferenceAssembly::attrsAffectingRepresentation;
 
 /* static */
@@ -247,6 +248,19 @@ UsdMayaReferenceAssembly::initialize()
     status = addAttribute(outStageDataAttr);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    usdVariantsLayerAttr = typedAttrFn.create(
+        "usdVariantsLayer",
+        "uvl",
+        MFnData::kString,
+        MObject::kNullObj,
+        &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    typedAttrFn.setHidden(true);
+    typedAttrFn.setInternal(true);
+    typedAttrFn.setStorable(true);
+    status = addAttribute(usdVariantsLayerAttr);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     //
     // add attribute dependencies
     //
@@ -257,6 +271,7 @@ UsdMayaReferenceAssembly::initialize()
     status = attributeAffects(filePathAttr, outStageDataAttr);
 
     status = attributeAffects(inStageDataCachedAttr, outStageDataAttr);
+    status = attributeAffects(inStageDataCachedAttr, usdVariantsLayerAttr);
 
     status = attributeAffects(primPathAttr, outStageDataAttr);
 
@@ -727,6 +742,15 @@ UsdMayaReferenceAssembly::computeInStageDataCached(MDataBlock& dataBlock)
                 unsharedSessionLayer->TransferContent(sessionLayer);
                 sessionLayer = unsharedSessionLayer;
             }
+
+            // OF3D: Update usdVariantLayer attribute
+            MDataHandle usdVariantsLayerHandle =
+                dataBlock.outputValue(usdVariantsLayerAttr, &retValue);
+            CHECK_MSTATUS_AND_RETURN_IT(retValue);
+
+            std::string variants;
+            sessionLayer->ExportToString(&variants);
+            usdVariantsLayerHandle.setString(variants.c_str());
 
             UsdStageCacheContext ctx(UsdMayaStageCache::Get());
             usdStage = UsdStage::Open(rootLayer,

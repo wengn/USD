@@ -110,6 +110,9 @@ public:
     static MObject inStageDataCachedAttr;
     PXRUSDMAYA_API
     static MObject outStageDataAttr;
+    // OF3D: for pxrUsd-Arnold translator
+    PXRUSDMAYA_API
+    static MObject usdVariantsLayerAttr;    
     PXRUSDMAYA_API
     static std::vector<MObject> attrsAffectingRepresentation;
 
