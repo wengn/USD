@@ -41,6 +41,10 @@ set(PXR_PYTHON_SHEBANG "${PYTHON_EXECUTABLE}"
     "Replacement path for Python #! line."
 )
 
+# Naiqi's change
+set(PYSIDE_USE_PYSIDE2 ON)
+set(PYSIDEUICBINARY "/usr/bin/pyside2-uic")
+
 # CXXDefaults will set a variety of variables for the project.
 # Consume them here. This is an effort to keep the most common
 # build files readable.
