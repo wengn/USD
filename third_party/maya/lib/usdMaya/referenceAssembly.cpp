@@ -1255,6 +1255,11 @@ bool UsdMayaRepresentationProxyBase::activate()
         assemblyFn.findPlug(UsdMayaReferenceAssembly::outStageDataAttr, true),
         shapeFn.findPlug(UsdMayaProxyShape::inStageDataAttr, true));
 
+    // OF3D: connect attr to proxyshape
+    dgMod.connect(
+         assemblyFn.findPlug(UsdMayaReferenceAssembly::usdVariantsLayerAttr, true),
+         shapeFn.findPlug(UsdMayaProxyShape::usdVariantsLayerAttr, true));
+
     _OverrideProxyPlugs(shapeFn, dgMod);
 
     dgMod.newPlugValueBool(

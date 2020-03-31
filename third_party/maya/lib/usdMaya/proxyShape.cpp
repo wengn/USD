@@ -132,6 +132,7 @@ MObject UsdMayaProxyShape::drawRenderPurposeAttr;
 MObject UsdMayaProxyShape::drawProxyPurposeAttr;
 MObject UsdMayaProxyShape::drawGuidePurposeAttr;
 MObject UsdMayaProxyShape::softSelectableAttr;
+MObject UsdMayaProxyShape::usdVariantsLayerAttr;
 
 
 /* static */
@@ -318,6 +319,21 @@ UsdMayaProxyShape::initialize()
     numericAttrFn.setReadable(false);
     numericAttrFn.setAffectsAppearance(true);
     retValue = addAttribute(drawGuidePurposeAttr);
+    CHECK_MSTATUS_AND_RETURN_IT(retValue);
+
+    // OF3D: receive variant session layer info
+    usdVariantsLayerAttr = typedAttrFn.create(
+        "usdVariantsLayer",
+        "usdVariantsLayer",
+         MFnData::kString,
+         MObject::kNullObj,
+          &retValue);
+    typedAttrFn.setHidden(true);
+    typedAttrFn.setInternal(true);
+    typedAttrFn.setStorable(true);
+    typedAttrFn.setAffectsAppearance(true);
+    CHECK_MSTATUS_AND_RETURN_IT(retValue);
+    retValue = addAttribute(usdVariantsLayerAttr);
     CHECK_MSTATUS_AND_RETURN_IT(retValue);
 
     softSelectableAttr = numericAttrFn.create(

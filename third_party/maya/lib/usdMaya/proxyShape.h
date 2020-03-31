@@ -110,7 +110,11 @@ class UsdMayaProxyShape : public MPxSurfaceShape,
         static MObject drawProxyPurposeAttr;
         PXRUSDMAYA_API
         static MObject drawGuidePurposeAttr;
-        
+
+        // OF3D: for pxrUsd-Arnold translator
+        PXRUSDMAYA_API
+        static MObject usdVariantsLayerAttr;
+
         PXRUSDMAYA_API
         static MObject softSelectableAttr;
 
